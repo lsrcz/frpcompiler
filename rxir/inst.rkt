@@ -8,6 +8,7 @@
 (struct rx-merge (stream-list) #:transparent)
 (struct rx-merge-action (stream-list) #:transparent)
 (struct rx-pipe (stream ops) #:transparent)
+(struct rx-custom (stream name) #:transparent)
 
 (struct rx-start-with-undefined () #:transparent)
 (struct rx-buffer-count (buffer-size start-buffer-every) #:transparent)

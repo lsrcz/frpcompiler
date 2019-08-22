@@ -15,6 +15,8 @@
 (define bind-body caddr)
 (define bind-name cadr)
 (define bind-inst cadddr)
+(define custom-name cadr)
+(define custom-body caddr)
 
 
 (define (build-begin seq) (cons 'begin seq))
@@ -24,6 +26,7 @@
 (define (build-if-else arg then-branch else-branch)
   (list 'if-else arg then-branch else-branch))
 (define (build-return arg) (list 'return arg))
+(define (build-custom name inst) (list 'custom name inst))
 
 
 (define (if? body) (eq? (get-op body) 'if))
@@ -32,3 +35,4 @@
 (define (return? body) (eq? (get-op body) 'return))
 (define (let? body) (eq? (get-op body) 'let))
 (define (bind? body) (eq? (get-op body) 'bind))
+(define (custom? body) (eq? (get-op body) 'custom))

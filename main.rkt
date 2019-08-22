@@ -41,7 +41,11 @@
                (let x (g (prev mode)))
                (if x (return x))))))])
     (print-with-spec (compile spec1) spec1))
-  (print-with-spec (compile drawing-spec) drawing-spec))
+  (print-with-spec (compile drawing-spec) drawing-spec)
+  (print-inst-list (translate-spec
+    (monad-desugar-spec
+     (expand-spec drawing-custom-spec))))
+  (print-with-spec (compile drawing-custom-spec) drawing-custom-spec))
 
                 
      

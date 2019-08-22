@@ -43,12 +43,14 @@
 
 (define (find-missing-var-deep lst funclst return-val inst)
   (let* ([missing-in-arg
-          (find-missing-var lst funclst return-val
-                            ((cond [(bind? inst) bind-body]
-                                   [(if? inst) if-arg]
-                                   [(if-else? inst) if-else-arg]
-                                   [(return? inst) return-arg])
-                             inst))]
+          (if (custom? inst)
+              (all-found)
+              (find-missing-var lst funclst return-val
+                                ((cond [(bind? inst) bind-body]
+                                       [(if? inst) if-arg]
+                                       [(if-else? inst) if-else-arg]
+                                       [(return? inst) return-arg])
+                                 inst)))]
          [new-lst (append (if (bind? inst) (list (bind-name inst)) '()) lst)]
          [missing-in-next-inst-first
           (if (not (return? inst))
@@ -56,6 +58,7 @@
                                      ((cond [(bind? inst) bind-inst]
                                             [(if? inst) if-branch]
                                             [(if-else? inst) if-else-then-branch]
+                                            [(custom? inst) custom-body]
                                             [else "should not happen"])
                                       inst))
               (all-found))]

@@ -14,6 +14,8 @@
            (desugar-begin body)]
           [(let? body)
            (error "should not happen")]
+          [(custom? body)
+           (desugar-custom body)]
           [else body]))
   (define (desugar-if body)
     (let ([arg (if-arg body)]
@@ -35,6 +37,10 @@
                 (build-bind (let-name let-stmt) (let-body let-stmt) (desugar-seq (cdr body))))
               (error "wrong format"))))
     (desugar-seq (begin-seq body)))
+  (define (desugar-custom body)
+    (let ([name (custom-name body)]
+          [desugared-inst (desugar-body (custom-body body))])
+      (build-custom name desugared-inst)))
   (let ([name (car spec)]
         [body (cadr spec)])
     (list name (desugar-body body))))

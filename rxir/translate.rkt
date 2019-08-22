@@ -42,7 +42,7 @@
             (map-ref ref)
             (list
              (rx-map-shape (get-shape ref) ((if (list? shape) append cons) shape (list to-compute))))))]))
-(define (emit-filter ir)
+    (define (emit-filter ir)
       (match ir
         [(filter-inst arg ref shape)
          (rx-pipe
@@ -83,6 +83,12 @@
             (get-shape ref)
             return-val
             action)))]))
+    (define (emit-custom ir)
+      (match ir
+        [(custom-inst name ref _)
+         (rx-custom
+          (map-ref ref)
+          name)]))
     ((cond [(input-inst? ir) emit-input]
            [(intro-inst? ir) emit-intro]
            [(compute-inst? ir) emit-compute]
@@ -92,6 +98,7 @@
            [(merge-inst? ir) emit-merge]
            [(merge-action-inst? ir) emit-merge-action]
            [(ret-action-inst? ir) emit-ret-action]
+           [(custom-inst? ir) emit-custom]
            [else (error "not-implemented")])
      ir))
   (define (iter ir-list rxir-mapping)
@@ -113,7 +120,8 @@
          [r7 (ret-inst 't (cons r6 0))]
          [r8 (merge-inst (list r6 r7))]
          [r9 (merge-action-inst (list r6 r7))]
-         [r10 (ret-action-inst 'x '(bind e (g x) (return e)) (cons r6 0))])
+         [r10 (ret-action-inst 'x '(bind e (g x) (return e)) (cons r6 0))]
+         [r11 (custom-inst 'custom r5 '(b (prev b) a t))])
     (print-rx-program '(a b)
      (emit-rxir
       (list
@@ -126,5 +134,6 @@
        r7
        r8
        r9
-       r10)))))
+       r10
+       r11)))))
     

@@ -26,6 +26,8 @@
                  (append (iter (car p)) (iter (cdr p))))]
             [else '()]))
     (append (iter (bind-body inst)) (analyze-prev (bind-inst inst))))
+  (define (analyze-prev-custom inst)
+    (analyze-prev (custom-body inst)))
   (cond [(if? inst)
          (analyze-prev-if inst)]
         [(if-else? inst)
@@ -34,6 +36,8 @@
          (analyze-prev-bind inst)]
         [(return? inst)
          (analyze-prev-return inst)]
+        [(custom? inst)
+         (analyze-prev-custom inst)]
         [else (error "should not happen")]))
 
 (define (translate inputs func-list start-input return-val should-emit-action inst)
@@ -75,6 +79,7 @@
            [(return? inst) translate-return]
            [(if? inst) translate-if]
            [(if-else? inst) translate-if-else]
+           [(custom? inst) translate-custom]
            [else (error "not implemented")])
      intro-mapping ref inst))
   (define (translate-return-val-found intro-mapping ref inst)
@@ -162,6 +167,12 @@
       (if intro-inst
           (cons intro-inst inst-list)
           inst-list)))
+  (define (translate-custom intro-mapping ref inst)
+    (let* ([name (custom-name inst)]
+           [shape (get-shape ref)]
+           [new-inst (custom-inst name ref shape)]
+           [body-inst-list (translate-inst intro-mapping new-inst (custom-body inst))])
+      (cons new-inst body-inst-list)))
   (define (unfold-prev prev)
     (if (list? prev)
         (match (unfold-prev (cadr prev))
@@ -240,6 +251,7 @@
   (define spec4 '(bind a (f move) (if a (return a))))
   (define spec5 '(bind a (f move) (bind b (g down) (if-else a (return a) (return b)))))
   (define spec6 '(if-else move (return drawing) (return down)))
+  (define spec7 '(bind a (f move) (custom c (return a))))
   (println (analyze-prev spec))
   (println "--1--")
   (print-inst-list (translate '(move) '(f) 'move 'drawing #f spec1))
@@ -252,6 +264,8 @@
   (println "--5--")
   (print-inst-list (translate '(move down) '(f g) 'move 'drawing #f spec5))
   (println "--6--")
-  (print-inst-list (translate '(move down) '() 'move 'drawing #t spec6)))
+  (print-inst-list (translate '(move down) '() 'move 'drawing #t spec6))
+  (println "--7--")
+  (print-inst-list (translate '(move) '(f) 'move 'drawing #f spec7)))
   
     

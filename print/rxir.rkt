@@ -82,6 +82,7 @@
           [(rx-name-ref? s) (format "~a" (rx-name-ref-name s))]
           [(rx-stream-ref? s) (format-ref s)]
           [(rx-stream-pair-ref? s) (format-pair-ref s)]
+          [(rx-custom? s) (format-custom s)]
           [else (error "not implemented")]))
   (define (format-pipe pipe)
     (match pipe
@@ -89,6 +90,9 @@
        (if (null? ops)
            (format-stream stream)
            (string-append (format-stream stream) ".pipe(\n" (format-operators ops) "  )"))]))
+  (define (format-custom custom)
+    (match custom
+      ([rx-custom stream name] (format "~a(~a)" name (format-stream stream)))))
   (define (format-operator op)
     (define (format-rx-start-with-undefined)
       "startWith(undefined)")

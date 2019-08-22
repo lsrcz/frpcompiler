@@ -33,7 +33,8 @@
       [(ret-inst arg ref) (format "~a = ~a.return(~a)" (inst->str inst) (inst->str ref) arg)]
       [(ret-action-inst return-val action ref) (format "~a = ~a.retact(~a => ~a)" (inst->str inst) (inst->str ref) return-val action)]
       [(merge-inst to-merge) (format "~a = merge(~a)" (inst->str inst) (map inst->str to-merge))]
-      [(merge-action-inst to-merge) (format "~a = mergeact(~a)" (inst->str inst) (map inst->str to-merge))]))
+      [(merge-action-inst to-merge) (format "~a = mergeact(~a)" (inst->str inst) (map inst->str to-merge))]
+      [(custom-inst name ref shape) (format "~a = ~a(~a) :: ~a" (inst->str inst) name (inst->str ref) shape)]))
   (define (iter inst-list)
     (if (null? inst-list)
         (void)

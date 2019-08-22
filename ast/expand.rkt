@@ -17,6 +17,8 @@
            (expand-begin body)]
           [(return? body)
            (expand-return body)]
+          [(custom? body)
+           (expand-custom body)]
           [(let? body)
            body]))
   (define (expand-begin body)
@@ -53,6 +55,9 @@
               (build-let temp arg)
               (build-return temp))))
           body)))
+  (define (expand-custom body)
+    (let ([name (custom-name body)])
+      (build-custom name (expand-body (custom-body body)))))
   (let ([name (car spec)]
         [body (cadr spec)])
     (list name (expand-body body))))
