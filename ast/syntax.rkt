@@ -19,6 +19,8 @@
 (define custom-body caddr)
 (define split-bindings cadr)
 (define split-body caddr)
+(define split-bindings-agg car)
+(define split-bindings-sub cdr)
 (define split-binding-name car)
 (define split-binding-body cadr)
 (define new-stream-body cadr)
@@ -32,7 +34,7 @@
   (list 'if-else arg then-branch else-branch))
 (define (build-return arg) (list 'return arg))
 (define (build-custom name inst) (list 'custom name inst))
-(define (build-split bindings body) (list 'split bindings body))
+(define (build-split agg bindings body) (list 'split (cons agg bindings) body))
 (define (build-new-stream body) (list 'new-stream body))
 (define (build-empty) (list 'empty))
 

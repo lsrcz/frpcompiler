@@ -45,8 +45,8 @@
    '(f g)
    '()
    '((mode
-      (split ((mode-snapshot mode)
-              (down-snapshot down))
+      (split (e (mode-snapshot mode)
+                (down-snapshot down))
              (if-else (f mode-snapshot)
                       (new-stream
                        ((move (if-else (g drawing)
