@@ -56,22 +56,20 @@
     (let ([name (custom-name body)])
       (build-custom name (expand-body (custom-body body)))))
   (define (expand-split body)
-    (define (iter bindings-agg bindings-sub built-bindings-sub-rev body)
-      (if (null? bindings-sub)
-          (build-split (cons bindings-agg (reverse built-bindings-sub-rev)) (expand-body body))
-          (let* ([cur (car bindings-sub)]
+    (define (iter bindings built-bindings-rev body)
+      (if (null? bindings)
+          (build-split (reverse built-bindings-rev) (expand-body body))
+          (let* ([cur (car bindings)]
                  [name (split-binding-name cur)]
                  [binding-body (split-binding-body cur)])
             (if (list? binding-body)
                 (let ([temp (temp-gen)])
                   (build-bind temp binding-body
-                              (iter bindings-agg (cdr bindings-sub) (cons (list name temp) built-bindings-sub-rev) body)))
-                (iter bindings-agg (cdr bindings-sub) (cons cur built-bindings-sub-rev) body)))))
+                              (iter (cdr bindings) (cons (list name temp) built-bindings-rev) body)))
+                (iter (cdr bindings) (cons cur built-bindings-rev) body)))))
     (let* ([bindings (split-bindings body)]
-           [bindings-agg (split-bindings-agg bindings)]
-           [bindings-sub (split-bindings-sub bindings)]
            [body (split-body body)])
-      (iter bindings-agg bindings-sub '() body)))
+      (iter bindings '() body)))
   (define (expand-new-stream body)
     (let ([expanded-body (map expand (new-stream-body body))])
       (build-new-stream expanded-body)))
