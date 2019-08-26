@@ -16,6 +16,10 @@
            (error "should not happen")]
           [(custom? body)
            (desugar-custom body)]
+          [(split? body)
+           (desugar-split body)]
+          [(new-stream? body)
+           (desugar-new-stream body)]
           [else body]))
   (define (desugar-if body)
     (let ([arg (if-arg body)]
@@ -37,6 +41,13 @@
                 (build-bind (let-name let-stmt) (let-body let-stmt) (desugar-seq (cdr body))))
               (error "wrong format"))))
     (desugar-seq (begin-seq body)))
+  (define (desugar-split body)
+    (let ([bindings (split-bindings body)]
+          [desugared-body (desugar-body (split-body body))])
+      (build-split bindings desugared-body)))
+  (define (desugar-new-stream body)
+    (let ([desugared-body (map monad-desugar (new-stream-body body))])
+      (build-new-stream desugared-body)))
   (define (desugar-custom body)
     (let ([name (custom-name body)]
           [desugared-inst (desugar-body (custom-body body))])
@@ -47,8 +58,8 @@
 
 (define (monad-desugar-spec spec-input)
   (match spec-input
-    [(spec inputs output funclist body)
-     (spec inputs output funclist (map monad-desugar body))]))
+    [(spec inputs output funclist constantlist body)
+     (spec inputs output funclist constantlist (map monad-desugar body))]))
 
 (define (main)
   (println (monad-desugar
@@ -88,7 +99,26 @@
                                  (return _temp0))
                                (begin
                                  (let _temp1 (n drawing (prev move) move))
-                                 (return _temp1))))))))))
+                                 (return _temp1)))))))))
+
+  (println (monad-desugar
+            '(mode
+              (begin
+                (let down-snap down)
+                (split ((mode-snapshot mode)
+                        (down-snapshot down-snap))
+                       (begin
+                         (let x (f mode-snapshot))
+                         (if-else x
+                                  (new-stream
+                                   ((move
+                                     (begin
+                                       (let d (g drawing))
+                                       (if-else d
+                                                (return (l down-snapshot move))
+                                                (return (n drawing (prev move) move)))))))
+                                  (empty-stream))))))))
+  )
 
 
               
