@@ -17,6 +17,9 @@
 (define bind-inst cadddr)
 (define custom-name cadr)
 (define custom-body caddr)
+(define split-bindings cadr)
+(define split-body caddr)
+(define new-stream-body cadr)
 
 
 (define (build-begin seq) (cons 'begin seq))
@@ -27,6 +30,9 @@
   (list 'if-else arg then-branch else-branch))
 (define (build-return arg) (list 'return arg))
 (define (build-custom name inst) (list 'custom name inst))
+(define (build-split bindings body) (list 'split bindings body))
+(define (build-new-stream body) (list 'new-stream body))
+(define (build-empty) (list 'empty))
 
 
 (define (if? body) (eq? (get-op body) 'if))
@@ -36,3 +42,6 @@
 (define (let? body) (eq? (get-op body) 'let))
 (define (bind? body) (eq? (get-op body) 'bind))
 (define (custom? body) (eq? (get-op body) 'custom))
+(define (split? body) (eq? (get-op body) 'split))
+(define (new-stream? body) (eq? (get-op body) 'new-stream))
+(define (empty-stream? body) (eq? (get-op body) 'empty-stream))
