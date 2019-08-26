@@ -7,6 +7,7 @@
 (require "../print/ir.rkt")
 (require "../util/util.rkt")
 (require "../test/test-spec.rkt")
+(require "../ast/nested-ref.rkt")
 
 (provide (all-defined-out))
 
@@ -40,14 +41,14 @@
          (analyze-prev-custom inst)]
         [else (error "should not happen")]))
 
-(define (translate-body inputs output funclist should-emit-action body)
-  (define (translate-new-stream body)
+(define (translate-body inputs output funclist should-emit-action ref-table-list body)
+  (define (translate-new-stream ref-table-list body)
     (define (gen-merge inst-list)
       (let ([ret-list (filter (lambda (x) (if should-emit-action (ret-action-inst? x) (ret-inst? x))) inst-list)])
         (if should-emit-action
             (append inst-list (list (merge-action-inst ret-list)))
             (append inst-list (list (merge-inst ret-list))))))
-    (define (translate start-input inst)
+    (define (translate start-input ref-table-list inst)
       (define (wrap-in-list s)
         (if (list? s) s (list s)))
       (define (compute-intro-shape intros intro-mapping shape)
@@ -73,9 +74,10 @@
       (define (possible-intro intro-mapping ref arg)
         (let* ([shape (get-shape ref)])
           (if
-           (if (list? shape)
-               (member arg shape)
-               (eq? arg shape))
+           (or (resolve-ref arg ref-table-list)
+               (if (list? shape)
+                   (member arg shape)
+                   (eq? arg shape)))
            #f
            (intro-inst (args-to-input-insts intro-mapping (list arg))
                        ref (compute-intro-shape (list arg) intro-mapping shape)))))
@@ -91,7 +93,7 @@
          intro-mapping ref inst))
       (define (translate-return-val-found intro-mapping ref inst)
         (let* ([shape (get-shape ref)]
-               [missing (find-missing-var-deep (wrap-in-list shape) funclist output inst)])
+               [missing (find-missing-var-deep (wrap-in-list shape) funclist output ref-table-list inst)])
           (match missing
             [(all-found)
              (list (ret-action-inst output inst ref))]
@@ -107,7 +109,7 @@
                (list new-intro-inst new-ret-action-inst))])))
       (define (translate-bind intro-mapping ref inst)
         (let* ([shape (get-shape ref)]
-               [missing (find-missing-var (wrap-in-list shape) funclist output (bind-body inst))])
+               [missing (find-missing-var (wrap-in-list shape) funclist output ref-table-list (bind-body inst))])
           (match missing
             [(all-found)
              (let ([new-inst
@@ -218,13 +220,13 @@
         (append inst-lst (translate-inst inputs-map start-ref inst))))
     (define (iter body)
       (define (translate-one spec-one)
-        (translate (car spec-one) (cadr spec-one)))
+        (translate (car spec-one) ref-table-list (cadr spec-one)))
       (if (null? body)
           '()
           (append (translate-one (car body))
                   (iter (cdr body)))))
-    (gen-merge (iter body)))
-  (translate-new-stream body))
+    (ir-list (gen-merge (iter body)) ref-table-list))
+  (translate-new-stream ref-table-list body))
 
 (define (translate-spec spec-input)
   (define (find-retval-in-spec output specs)
@@ -232,9 +234,10 @@
         #f
         (or (return-val-found-deep? output (car specs)) (find-retval-in-spec output (cdr specs)))))
   (match spec-input
-    [(spec inputs output funclist body)
-     (let ([should-emit-action (find-retval-in-spec output (map cadr body))])
-       (translate-body inputs output funclist should-emit-action body))]))
+    [(spec inputs output funclist constantlist body)
+     (let ([should-emit-action (find-retval-in-spec output (map cadr body))]
+           [init-ref-table (map (lambda (x) (nested-ref-table x '())) constantlist)])
+       (translate-body inputs output funclist should-emit-action init-ref-table body))]))
 
 (define (main)
   (define spec
@@ -257,20 +260,23 @@
   (define spec5 '((move (bind a (f move) (bind b (g down) (if-else a (return a) (return b)))))))
   (define spec6 '((move (if-else move (return drawing) (return down)))))
   (define spec7 '((move (bind a (f move) (custom c (return a))))))
+  (define spec8 '((move (bind a (f b) (custom c (return b))))))
   (println (analyze-prev spec))
   (println "--1--")
-  (print-inst-list (translate-body '(move) 'drawing '(f) #f spec1))
+  (print-inst-list (translate-body '(move) 'drawing '(f) #f '() spec1))
   (println "--2--")
-  (print-inst-list (translate-body '(move) 'drawing '(f) #f spec2))
+  (print-inst-list (translate-body '(move) 'drawing '(f) #f '() spec2))
   (println "--3--")
-  (print-inst-list (translate-body '(move down) 'drawing '(f) #f spec3))
+  (print-inst-list (translate-body '(move down) 'drawing '(f) #f '() spec3))
   (println "--4--")
-  (print-inst-list (translate-body '(move) 'drawing '(f) #f spec4))
+  (print-inst-list (translate-body '(move) 'drawing '(f) #f '() spec4))
   (println "--5--")
-  (print-inst-list (translate-body '(move down) 'drawing '(f g) #f spec5))
+  (print-inst-list (translate-body '(move down) 'drawing '(f g) #f '() spec5))
   (println "--6--")
-  (print-inst-list (translate-body '(move down) 'drawing '() #t spec6))
+  (print-inst-list (translate-body '(move down) 'drawing '() #t '() spec6))
   (println "--7--")
-  (print-inst-list (translate-body '(move) 'drawing '(f) #f spec7)))
+  (print-inst-list (translate-body '(move) 'drawing '(f) #f '() spec7))
+  (println "--8--")
+  (print-inst-list (translate-body '(move) 'drawing '(f) #f (list (nested-ref-table 'b '())) spec8)))
   
     

@@ -13,6 +13,8 @@
 (struct ret-action-inst (return-val action ref) #:transparent)
 (struct custom-inst (name ref shape) #:transparent)
 
+(struct ir-list (lst ref-table-lst) #:transparent)
+
 (define (get-shape inst)
   (match inst
     [(input-inst _ _ shape) shape]
