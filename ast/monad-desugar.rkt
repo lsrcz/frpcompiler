@@ -100,13 +100,13 @@
                                (begin
                                  (let _temp1 (n drawing (prev move) move))
                                  (return _temp1)))))))))
-
+  (newline)
   (println (monad-desugar
             '(mode
               (begin
                 (let down-snap down)
-                (split ((mode-snapshot mode)
-                        (down-snapshot down-snap))
+                (split (e (mode-snapshot mode)
+                          (down-snapshot down-snap))
                        (begin
                          (let x (f mode-snapshot))
                          (if-else x
