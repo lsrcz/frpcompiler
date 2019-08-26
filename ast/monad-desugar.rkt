@@ -118,6 +118,7 @@
                                                 (return (l down-snapshot move))
                                                 (return (n drawing (prev move) move)))))))
                                   (empty-stream))))))))
+  (println (monad-desugar-spec drawing-spec))
   )
 
 
