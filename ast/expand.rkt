@@ -13,64 +13,79 @@
            (expand-if body)]
           [(if-else? body)
            (expand-if-else body)]
-          [(begin? body)
-           (expand-begin body)]
           [(return? body)
            (expand-return body)]
           [(custom? body)
            (expand-custom body)]
-          [(let? body)
-           body]))
-  (define (expand-begin body)
-    (let ([seq (begin-seq body)])
-      (build-begin (map expand-body seq))))                                                                                                                                                             
+          [(split? body)
+           (expand-split body)]
+          [(new-stream? body)
+           (expand-new-stream body)]
+          [(empty-stream? body)
+           body]
+          [(bind? body)
+           (expand-bind body)]))
   (define (expand-if body)
     (let ([arg (if-arg body)]
           [expanded-branch (expand-body (if-branch body))])
       (if (list? arg)
           (let ([temp (temp-gen)])
-            (build-begin
-             (list
-              (build-let temp arg)
-              (build-if temp expanded-branch))))
+            (build-bind temp arg
+                        (build-if temp expanded-branch)))
           (build-if arg expanded-branch))))
+  (define (expand-bind body)
+    (build-bind (bind-name body) (bind-body body) (bind-inst body)))
   (define (expand-if-else body)
     (let ([arg (if-else-arg body)]
           [expanded-then (expand-body (if-else-then-branch body))]
           [expanded-else (expand-body (if-else-else-branch body))])
       (if (list? arg)
           (let ([temp (temp-gen)])
-            (build-begin
-             (list
-              (build-let temp arg)
-              (build-if-else temp expanded-then expanded-else))))
+            (build-bind temp arg
+                        (build-if-else temp expanded-then expanded-else)))
           (build-if-else arg expanded-then expanded-else)
           )))
   (define (expand-return body)
     (let ([arg (return-arg body)])
       (if (list? arg)
           (let ([temp (temp-gen)])
-            (build-begin
-             (list
-              (build-let temp arg)
-              (build-return temp))))
+            (build-bind temp arg
+                        (build-return temp)))
           body)))
   (define (expand-custom body)
     (let ([name (custom-name body)])
       (build-custom name (expand-body (custom-body body)))))
+  (define (expand-split body)
+    (define (iter bindings built-bindings-rev body)
+      (if (null? bindings)
+          (build-split (reverse built-bindings-rev) (expand-body body))
+          (let* ([cur (car bindings)]
+                 [name (split-binding-name cur)]
+                 [binding-body (split-binding-body cur)])
+            (if (list? binding-body)
+                (let ([temp (temp-gen)])
+                  (build-bind temp binding-body
+                              (iter (cdr bindings) (cons (list name temp) built-bindings-rev) body)))
+                (iter (cdr bindings) (cons cur built-bindings-rev) body)))))
+    (let ([bindings (split-bindings body)]
+          [body (split-body body)])
+      (iter bindings '() body)))
+  (define (expand-new-stream body)
+    (let ([expanded-body (map expand (new-stream-body body))])
+      (build-new-stream expanded-body)))
   (let ([name (car spec)]
         [body (cadr spec)])
     (list name (expand-body body))))
 
 (define (expand-spec spec-input)
   (match spec-input
-    [(spec inputs output funclist body)
-     (spec inputs output funclist (map expand body))]))
+    [(spec inputs output funclist constantlist body)
+     (spec inputs output funclist constantlist (map expand body))]))
+
+(require "monad-desugar.rkt")
 
 (define (main)
-  (println (expand (car (spec-body drawing-spec))))
-  (println (expand (cadr (spec-body drawing-spec))))
-  (println (expand (cadr (spec-body drawing-modified-spec))))
-  (println (expand-spec drawing-spec)))
+  (println (expand-spec (monad-desugar-spec drawing-spec)))
+  (println (expand-spec (monad-desugar-spec drawing-split-spec))))
 
 

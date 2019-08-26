@@ -19,6 +19,8 @@
 (define custom-body caddr)
 (define split-bindings cadr)
 (define split-body caddr)
+(define split-binding-name car)
+(define split-binding-body cadr)
 (define new-stream-body cadr)
 
 
