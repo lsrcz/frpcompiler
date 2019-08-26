@@ -4,6 +4,7 @@
 
 (struct input-inst (name num shape) #:transparent)
 (struct intro-inst (intro-lst ref shape) #:transparent)
+(struct intro-const-inst (intro-lst ref shape) #:transparent)
 (struct compute-inst (to-compute name ref shape) #:transparent)
 (struct filter-inst (arg ref shape) #:transparent)
 (struct partition-inst (arg ref shape) #:transparent)
@@ -12,6 +13,8 @@
 (struct merge-action-inst (to-merge) #:transparent)
 (struct ret-action-inst (return-val action ref) #:transparent)
 (struct custom-inst (name ref shape) #:transparent)
+(struct empty-inst () #:transparent)
+(struct split-inst (bindings body ref) #:transparent)
 
 (struct ir-list (lst ref-table-lst) #:transparent)
 
@@ -23,5 +26,6 @@
     [(filter-inst _ _ shape) shape]
     [(cons (partition-inst _ _ shape) _) shape]
     [(custom-inst _ _ shape) shape]
+    [(intro-const-inst _ _ shape) shape]
     [else (error "no shape")]))
 

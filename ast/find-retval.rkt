@@ -19,7 +19,9 @@
         [(if? inst) (iter (if-arg inst))]
         [(if-else? inst) (iter (if-else-arg inst))]
         [(custom? inst) #f]
+        [(split? inst) #f]
         [else (error "not implemented")]))
+
 (define (return-val-found-deep? return-val inst)
   (or (return-val-found? return-val inst)
       (cond [(bind? inst) (return-val-found-deep? return-val (bind-inst inst))]
@@ -28,4 +30,11 @@
             [(if-else? inst) (or (return-val-found-deep? return-val (if-else-else-branch inst))
                                  (return-val-found-deep? return-val (if-else-then-branch inst)))]
             [(custom? inst) (return-val-found-deep? return-val (custom-body inst))]
+            [(split? inst) (return-val-found-multiple? return-val (split-body inst))]
             [else (error "not implemented")])))
+
+(define (return-val-found-multiple? return-val specs)
+  (if (null? specs)
+      #f
+      (or (return-val-found-deep? return-val (car specs))
+          (return-val-found-multiple? return-val (cdr specs)))))

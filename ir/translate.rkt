@@ -29,6 +29,8 @@
     (append (iter (bind-body inst)) (analyze-prev (bind-inst inst))))
   (define (analyze-prev-custom inst)
     (analyze-prev (custom-body inst)))
+  (define (analyze-prev-split inst)
+    '())
   (cond [(if? inst)
          (analyze-prev-if inst)]
         [(if-else? inst)
@@ -39,16 +41,31 @@
          (analyze-prev-return inst)]
         [(custom? inst)
          (analyze-prev-custom inst)]
+        [(split? inst)
+         (analyze-prev-split inst)]
         [else (error "should not happen")]))
 
-(define (translate-body inputs output funclist should-emit-action ref-table-list body)
-  (define (translate-new-stream ref-table-list body)
+(define (translate-body inputs output funclist should-emit-action constantlist body)
+  (define (translate-imperative constantlist body)
+    (match body
+      [(list 'bind name body inst)
+       (build-bind name body (translate-imperative (add-ref name constantlist) inst))]
+      [(list 'if arg branch)
+       (build-if arg (translate-imperative constantlist branch))]
+      [(list 'if-else arg then-branch else-branch)
+       (build-if-else arg (translate-imperative constantlist then-branch) (translate-imperative constantlist else-branch))]
+      [(list 'empty-stream) (ir-list (list (empty-inst)) constantlist)]
+      [(list 'new-stream body) (translate-new-stream constantlist body)]
+      [_ (error "error pattern")]))
+  (define (translate-new-stream constantlist body)
     (define (gen-merge inst-list)
-      (let ([ret-list (filter (lambda (x) (if should-emit-action (ret-action-inst? x) (ret-inst? x))) inst-list)])
+      (let ([ret-list (filter (lambda (x) (or (split-inst? x)
+                                              (if should-emit-action (ret-action-inst? x) (ret-inst? x))))
+                              inst-list)])
         (if should-emit-action
             (append inst-list (list (merge-action-inst ret-list)))
             (append inst-list (list (merge-inst ret-list))))))
-    (define (translate start-input ref-table-list inst)
+    (define (translate start-input constantlist inst)
       (define (wrap-in-list s)
         (if (list? s) s (list s)))
       (define (compute-intro-shape intros intro-mapping shape)
@@ -74,14 +91,14 @@
       (define (possible-intro intro-mapping ref arg)
         (let* ([shape (get-shape ref)])
           (if
-           (or (resolve-ref arg ref-table-list)
-               (if (list? shape)
-                   (member arg shape)
-                   (eq? arg shape)))
+           (if (list? shape)
+               (member arg shape)
+               (eq? arg shape))
            #f
-           (intro-inst (args-to-input-insts intro-mapping (list arg))
-                       ref (compute-intro-shape (list arg) intro-mapping shape)))))
-
+           (if (resolve-ref arg constantlist)
+               (intro-const-inst (list arg) ref (if (list? shape) (append shape (list arg)) (list shape arg)))
+               (intro-inst (args-to-input-insts intro-mapping (list arg))
+                           ref (compute-intro-shape (list arg) intro-mapping shape))))))
       (define (translate-inst intro-mapping ref inst)
         ((cond [(return-val-found? output inst) translate-return-val-found]
                [(bind? inst) translate-bind]
@@ -89,15 +106,56 @@
                [(if? inst) translate-if]
                [(if-else? inst) translate-if-else]
                [(custom? inst) translate-custom]
+               [(split? inst) translate-split]
                [else (error "not implemented")])
          intro-mapping ref inst))
+      (define (translate-split intro-mapping ref inst)
+        (define (translate-final-split bindings intro-list body)
+          (let* ([shape (get-shape ref)]
+                 [new-intro-inst
+                  (if (null? intro-list)
+                      #f
+                      (intro-inst
+                       (args-to-input-insts intro-mapping intro-list)
+                       ref
+                       (compute-intro-shape intro-list intro-mapping shape)))]
+                 [split-ref (if new-intro-inst new-intro-inst ref)]
+                 [new-split-inst (split-inst
+                                  bindings
+                                  (translate-imperative (append (map car bindings) constantlist) body)
+                                  split-ref)])
+            (if new-intro-inst
+                (list new-intro-inst new-split-inst)
+                (list new-split-inst))))
+        (define (translate-restructure-split bindings processed-bindings-rev intro-list body)
+          (if (null? bindings)
+              (translate-final-split (reverse processed-bindings-rev) intro-list body)
+              (let* ([shape (get-shape ref)]
+                     [cur (car bindings)]
+                     [name (split-binding-name cur)]
+                     [arg (split-binding-body cur)])
+                (if
+                 (if (list? shape)
+                     (member arg shape)
+                     (eq? arg shape))
+                 (translate-restructure-split (cdr bindings) (cons cur processed-bindings-rev) intro-list body)
+                 (if (resolve-ref arg constantlist)
+                     (translate-restructure-split (cdr bindings) processed-bindings-rev intro-list
+                                        (build-bind name arg body))
+                     (translate-restructure-split (cdr bindings) (cons cur processed-bindings-rev)
+                                        (cons arg intro-list) body))))))
+        (match inst
+          [(list 'split bindings body)
+           (translate-restructure-split bindings '() '() body)]))
+        
       (define (translate-return-val-found intro-mapping ref inst)
         (let* ([shape (get-shape ref)]
-               [missing (find-missing-var-deep (wrap-in-list shape) funclist output ref-table-list inst)])
+               [missing (find-missing-var-deep (wrap-in-list shape) funclist output constantlist inst)])
           (match missing
             [(all-found)
              (list (ret-action-inst output inst ref))]
-            [(not-found intros)
+            [(not-found (list) _) (list (ret-action-inst output inst ref))]
+            [(not-found intros _)
              (let* ([intros-shape (compute-intro-shape intros intro-mapping shape)]
                     [new-intro-inst
                      (intro-inst
@@ -109,7 +167,7 @@
                (list new-intro-inst new-ret-action-inst))])))
       (define (translate-bind intro-mapping ref inst)
         (let* ([shape (get-shape ref)]
-               [missing (find-missing-var (wrap-in-list shape) funclist output ref-table-list (bind-body inst))])
+               [missing (find-missing-var (wrap-in-list shape) funclist output constantlist (bind-body inst))])
           (match missing
             [(all-found)
              (let ([new-inst
@@ -122,7 +180,18 @@
                          (cons shape (list (bind-name inst)))))])
                (cons new-inst
                      (translate-inst intro-mapping new-inst (bind-inst inst))))]
-            [(not-found intros)
+            [(not-found (list) _)
+             (let ([new-inst
+                    (compute-inst
+                     (bind-body inst)
+                     (bind-name inst)
+                     ref
+                     (if (list? shape)
+                         (append shape (list (bind-name inst)))
+                         (cons shape (list (bind-name inst)))))])
+               (cons new-inst
+                     (translate-inst intro-mapping new-inst (bind-inst inst))))]
+            [(not-found intros _)
              (let* ([intros-shape (compute-intro-shape intros intro-mapping shape)]
                     [new-intro-inst
                      (intro-inst
@@ -220,24 +289,19 @@
         (append inst-lst (translate-inst inputs-map start-ref inst))))
     (define (iter body)
       (define (translate-one spec-one)
-        (translate (car spec-one) ref-table-list (cadr spec-one)))
+        (translate (car spec-one) constantlist (cadr spec-one)))
       (if (null? body)
           '()
           (append (translate-one (car body))
                   (iter (cdr body)))))
-    (ir-list (gen-merge (iter body)) ref-table-list))
-  (translate-new-stream ref-table-list body))
+    (ir-list (gen-merge (iter body)) constantlist))
+  (translate-new-stream constantlist body))
 
 (define (translate-spec spec-input)
-  (define (find-retval-in-spec output specs)
-    (if (null? specs)
-        #f
-        (or (return-val-found-deep? output (car specs)) (find-retval-in-spec output (cdr specs)))))
   (match spec-input
     [(spec inputs output funclist constantlist body)
-     (let ([should-emit-action (find-retval-in-spec output (map cadr body))]
-           [init-ref-table (map (lambda (x) (nested-ref-table x '())) constantlist)])
-       (translate-body inputs output funclist should-emit-action init-ref-table body))]))
+     (let ([should-emit-action (return-val-found-multiple? output (map cadr body))])
+       (translate-body inputs output funclist should-emit-action constantlist body))]))
 
 (define (main)
   (define spec
@@ -261,6 +325,8 @@
   (define spec6 '((move (if-else move (return drawing) (return down)))))
   (define spec7 '((move (bind a (f move) (custom c (return a))))))
   (define spec8 '((move (bind a (f b) (custom c (return b))))))
+  (define spec9 '((move (if b (return move)))))
+  (define spec10 '((move (split ((a p) (b q)) (if a (if b (new-stream ((mode (return mode))))))))))
   (println (analyze-prev spec))
   (println "--1--")
   (print-inst-list (translate-body '(move) 'drawing '(f) #f '() spec1))
@@ -277,6 +343,11 @@
   (println "--7--")
   (print-inst-list (translate-body '(move) 'drawing '(f) #f '() spec7))
   (println "--8--")
-  (print-inst-list (translate-body '(move) 'drawing '(f) #f (list (nested-ref-table 'b '())) spec8)))
+  (print-inst-list (translate-body '(move) 'drawing '(f) #f '(b) spec8))
+  (println "--9--")
+  (print-inst-list (translate-body '(move) 'drawing '() #f '(b) spec9))
+  (println "--10--")
+  (print-inst-list (translate-body '(move mode q) 'drawing '() #f '(p) spec10))
+  )
   
     
