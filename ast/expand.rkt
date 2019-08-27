@@ -34,7 +34,7 @@
                         (build-if temp expanded-branch)))
           (build-if arg expanded-branch))))
   (define (expand-bind body)
-    (build-bind (bind-name body) (bind-body body) (bind-inst body)))
+    (build-bind (bind-name body) (bind-body body) (expand-body (bind-inst body))))
   (define (expand-if-else body)
     (let ([arg (if-else-arg body)]
           [expanded-then (expand-body (if-else-then-branch body))]
