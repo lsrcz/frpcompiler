@@ -326,7 +326,13 @@
   (define spec7 '((move (bind a (f move) (custom c (return a))))))
   (define spec8 '((move (bind a (f b) (custom c (return b))))))
   (define spec9 '((move (if b (return move)))))
-  (define spec10 '((move (split ((a p) (b q)) (if a (if b (new-stream ((mode (return mode))))))))))
+  (define spec10 '((move (bind _temp0 (f p)
+                               (bind _temp1 (g q)
+                                     (split ((a _temp0) (b _temp1) (c mode))
+                                            (bind _temp2 (f a)
+                                                  (if _temp2
+                                                      (bind _temp3 (g b)
+                                                            (if _temp3 (new-stream ((mode (return mode))))))))))))))
   (println (analyze-prev spec))
   (println "--1--")
   (print-inst-list (translate-body '(move) 'drawing '(f) #f '() spec1))
@@ -347,7 +353,7 @@
   (println "--9--")
   (print-inst-list (translate-body '(move) 'drawing '() #f '(b) spec9))
   (println "--10--")
-  (print-inst-list (translate-body '(move mode q) 'drawing '() #f '(p) spec10))
+  (print-inst-list (translate-body '(move mode q) 'drawing '(f g) #f '(p) spec10))
   )
   
     
