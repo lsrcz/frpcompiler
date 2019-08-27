@@ -40,9 +40,9 @@
 
 (define drawing-split-spec
   (spec
-   '(mode down mode)
+   '(mode down move)
    'drawing
-   '(f g)
+   '(f g l n)
    '()
    '((mode
       (split ((mode-snapshot mode)
