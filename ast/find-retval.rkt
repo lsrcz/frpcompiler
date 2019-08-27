@@ -22,6 +22,14 @@
         [(split? inst) #f]
         [else (error "not implemented")]))
 
+(define (return-val-found-imperative? return-val inst)
+  (cond [(bind? inst) (return-val-found-imperative? return-val (bind-inst inst))]
+        [(if? inst) (return-val-found-imperative? return-val (if-branch inst))]
+        [(if-else? inst) (or (return-val-found-imperative? return-val (if-else-then-branch inst))
+                             (return-val-found-imperative? return-val (if-else-else-branch inst)))]
+        [(empty-stream? inst) #f]
+        [(new-stream? inst) (return-val-found-multiple? return-val (map cadr (new-stream-body inst)))]))
+
 (define (return-val-found-deep? return-val inst)
   (or (return-val-found? return-val inst)
       (cond [(bind? inst) (return-val-found-deep? return-val (bind-inst inst))]
@@ -30,7 +38,7 @@
             [(if-else? inst) (or (return-val-found-deep? return-val (if-else-else-branch inst))
                                  (return-val-found-deep? return-val (if-else-then-branch inst)))]
             [(custom? inst) (return-val-found-deep? return-val (custom-body inst))]
-            [(split? inst) (return-val-found-multiple? return-val (split-body inst))]
+            [(split? inst) (return-val-found-imperative? return-val (split-body inst))]
             [else (error "not implemented")])))
 
 (define (return-val-found-multiple? return-val specs)
