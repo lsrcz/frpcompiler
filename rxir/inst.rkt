@@ -9,6 +9,7 @@
 (struct rx-merge-action (stream-list) #:transparent)
 (struct rx-pipe (stream ops) #:transparent)
 (struct rx-custom (stream name) #:transparent)
+(struct rx-empty () #:transparent)
 
 (struct rx-start-with-undefined () #:transparent)
 (struct rx-buffer-count (buffer-size start-buffer-every) #:transparent)
@@ -18,3 +19,6 @@
 (struct rx-filter (from-shape arg) #:transparent)
 (struct rx-partition (from-shape arg) #:transparent)
 (struct rx-ret-action (from-shape return-val action) #:transparent)
+(struct rx-switch-map (from-shape body) #:transparent)
+
+(struct rxir-list (lst) #:transparent)

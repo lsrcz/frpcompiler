@@ -5,32 +5,8 @@
 (provide print-rx-program)
 
 (struct reg-inst (inst reg) #:transparent)
+(define (format-rx-program inputs rxir-list-input)
 
-(define (format-rx-program inputs rx-inst-list)
-  (define (add-reg inst-list num)
-    (if (null? inst-list)
-        '()
-        (cons
-         (reg-inst (car inst-list) (string->symbol (format "r~a" num)))
-         (add-reg (cdr inst-list) (+ 1 num)))))
-  (define regged-inst-list (add-reg rx-inst-list 0))
-  (define (inst->reg inst)
-    (if (pair? inst)
-        (cons (inst->reg (car inst)) (cdr inst))
-        (reg-inst-reg (car
-                       (filter
-                        (lambda (x)
-                          (match x
-                            [(reg-inst inst1 reg) (eq? inst inst1)]))
-                        regged-inst-list)))))
-  (define (reg->str reg)
-    (if (pair? reg)
-        (format "~a[~a]" (car reg) (cdr reg))
-        (format "~a" reg)))
-  (define (ref->str ref)
-    (reg->str (inst->reg (rx-stream-ref-stream ref))))
-  (define (pair-ref->str ref)
-    (format "~a[~a]" (reg->str (inst->reg (rx-stream-pair-ref-stream ref))) (rx-stream-pair-ref-num ref)))
   (define (format-comma-sep to-str)
     (define (iter lst)
       (if (null? lst)
@@ -40,7 +16,6 @@
               (string-append (to-str (car lst)) ", " (iter (cdr lst))))))
     iter)
   (define format-symbol-list (format-comma-sep symbol->string))
-  (define format-stream-list (format-comma-sep ref->str))
   (define (format-prev p)
     (match p
       [(list 'prev n) (string-append "prev_" (format-prev n))]
@@ -65,106 +40,149 @@
         (if (list? x)
             (string-append (format-shape-with-bracket x))
             (symbol->string x)))) lst))
-  (define (format-merge m)
-    (match m
-      [(rx-merge lst) (string-append "merge(" (format-stream-list lst) ")")]))
-  (define (format-merge-action m)
-    (match m
-      [(rx-merge-action lst) (format "merge(~a).pipe(\n    scan((acc, cur) => cur(acc), undefined),\n    filter(Boolean),\n  )" (format-stream-list lst))]))
-  (define (format-ref r)
-    (ref->str r))
-  (define (format-pair-ref r)
-    (pair-ref->str r))
-  (define (format-stream s)
-    (cond [(rx-merge? s) (format-merge s)]
-          [(rx-merge-action? s) (format-merge-action s)]
-          [(rx-pipe? s) (format-pipe s)]
-          [(rx-name-ref? s) (format "~a" (rx-name-ref-name s))]
-          [(rx-stream-ref? s) (format-ref s)]
-          [(rx-stream-pair-ref? s) (format-pair-ref s)]
-          [(rx-custom? s) (format-custom s)]
-          [else (error "not implemented")]))
-  (define (format-pipe pipe)
-    (match pipe
-      [(rx-pipe stream ops)
-       (if (null? ops)
-           (format-stream stream)
-           (string-append (format-stream stream) ".pipe(\n" (format-operators ops) "  )"))]))
-  (define (format-custom custom)
-    (match custom
-      ([rx-custom stream name] (format "~a(~a)" name (format-stream stream)))))
-  (define (format-operator op)
-    (define (format-rx-start-with-undefined)
-      "startWith(undefined)")
-    (define (format-rx-buffer-count buffer-size start-buffer-every)
-      (format "bufferCount(~a, ~a)" buffer-size start-buffer-every))
-    (define (format-rx-map-shape from-shape to-shape)
-      (format "map((~a) => ~a)" (format-shape-with-bracket from-shape) (format-shape-with-bracket to-shape)))
-    (define (format-rx-with-latest-from streams)
-      (format "withLatestFrom(~a)" (format-stream-list streams)))
-    (define (format-rx-map-flat from-nested-shape to-shape)
-      (format "map(([~a]) => ~a)" (format-nested-shape from-nested-shape) (format-shape-with-bracket to-shape)))
-    (define (format-rx-filter from-shape arg)
-      (format "filter((~a) => ~a)" (format-shape-with-bracket from-shape) arg))
-    (define (format-rx-partition from-shape arg)
-      (format "partition((~a) => ~a)" (format-shape-with-bracket from-shape) arg))
-    (define (format-rx-ret-action from-shape return-val action)
-      (define (format-action action)
-        (define (format-action-inner action ident)
-          (define (get-ident ident)
-            (if (= ident 0)
-                ""
-                (string-append " " (get-ident (- ident 1)))))
-          (define (format-action-bind action ident)
-            (string-append (get-ident ident)
-                           (format "const ~a = ~a;\n" (bind-name action) (format-symbol (bind-body action)))
-                           (format-action-inner (bind-inst action) ident)))
-          (define (format-action-if action ident)
-            (string-append (get-ident ident)
-                           (format "if (~a) {\n" (if-arg action))
-                           (format-action-inner (if-branch action) (+ ident 2))
-                           (get-ident ident)
-                           "}\n"))
-          (define (format-action-if-else action ident)
-            (string-append (get-ident ident)
-                           (format "if (~a) {\n" (if-else-arg action))
-                           (format-action-inner (if-else-then-branch action) (+ ident 2))
-                           (get-ident ident)
-                           "} else {\n"
-                           (format-action-inner (if-else-else-branch action) (+ ident 2))
-                           (get-ident ident)
-                           "}\n"))
-          (define (format-action-return action ident)
-            (string-append (get-ident ident)
-                           (format "return ~a;\n" (return-arg action))))
-          ((cond [(bind? action) format-action-bind]
-                 [(if? action) format-action-if]
-                 [(if-else? action) format-action-if-else]
-                 [(return? action) format-action-return])
-           action ident))
-        (format-action-inner action 6))
-      (format "map((~a) => ~a => {\n~a    })" (format-shape-with-bracket from-shape) return-val (format-action action)))
-    (match op
-      [(rx-start-with-undefined) (format-rx-start-with-undefined)]
-      [(rx-buffer-count buffer-size start-buffer-every) (format-rx-buffer-count buffer-size start-buffer-every)]
-      [(rx-map-shape from-shape to-shape) (format-rx-map-shape from-shape to-shape)]
-      [(rx-with-latest-from streams) (format-rx-with-latest-from streams)]
-      [(rx-map-flat from-nested-shape to-shape) (format-rx-map-flat from-nested-shape to-shape)]
-      [(rx-filter from-shape arg) (format-rx-filter from-shape arg)]
-      [(rx-partition from-shape arg) (format-rx-partition from-shape arg)]
-      [(rx-ret-action from-shape return-val action) (format-rx-ret-action from-shape return-val action)]
-      [else (error "not implemented")]))
-  (define (format-operators ops)
-    (if (null? ops)
+  (define (get-ident ident)
+    (if (= ident 0)
         ""
-        (string-append "    " (format-operator (car ops)) ",\n" (format-operators (cdr ops)))))
-  (define (format-inst inst)
-    (format "const ~a = ~a" (format-stream (rx-stream-ref inst)) (format-stream inst)))
-  (define (format-streams lst)
-    (if (null? lst)
-        ""
-        (string-append "  " (format-inst (car lst)) ";\n" (format-streams (cdr lst)))))
-  (string-append "function " "compiled(" (format-symbol-list inputs) ") {\n" (format-streams rx-inst-list) (format "  return ~a;\n" (format-stream (rx-stream-ref (last rx-inst-list)))) "}\n"))
+        (string-append " " (get-ident (- ident 1)))))
+  
+  (define (format-rx-program-inner ident rxir-list-input)
+    (define rx-inst-list
+      (match rxir-list-input
+        [(rxir-list lst) lst]))
+    (define (add-reg inst-list num)
+      (if (null? inst-list)
+          '()
+          (cons
+           (reg-inst (car inst-list) (string->symbol (format "r~a" num)))
+           (add-reg (cdr inst-list) (+ 1 num)))))
+    (define regged-inst-list (add-reg rx-inst-list 0))
+    (define (inst->reg inst)
+      (if (pair? inst)
+          (cons (inst->reg (car inst)) (cdr inst))
+          (reg-inst-reg (car
+                         (filter
+                          (lambda (x)
+                            (match x
+                              [(reg-inst inst1 reg) (eq? inst inst1)]))
+                          regged-inst-list)))))
+    (define (reg->str reg)
+      (if (pair? reg)
+          (format "~a[~a]" (car reg) (cdr reg))
+          (format "~a" reg)))
+    (define (ref->str ref)
+      (reg->str (inst->reg (rx-stream-ref-stream ref))))
+    (define (pair-ref->str ref)
+      (format "~a[~a]" (reg->str (inst->reg (rx-stream-pair-ref-stream ref))) (rx-stream-pair-ref-num ref)))
+    (define format-stream-list (format-comma-sep ref->str))
+    
+    (define (format-merge m)
+      (match m
+        [(rx-merge lst) (string-append "merge(" (format-stream-list lst) ")")]))
+    (define (format-merge-action ident m)
+      (match m
+        [(rx-merge-action lst) (format "merge(~a).pipe(\n~ascan((acc, cur) => cur(acc), undefined),\n~afilter(Boolean),\n~a)"
+                                       (format-stream-list lst)
+                                       (get-ident (+ ident 2))
+                                       (get-ident (+ ident 2))
+                                       (get-ident ident))]))
+    (define (format-ref r)
+      (ref->str r))
+    (define (format-pair-ref r)
+      (pair-ref->str r))
+    (define (format-stream ident s)
+      (cond [(rx-merge? s) (format-merge s)]
+            [(rx-merge-action? s) (format-merge-action ident s)]
+            [(rx-pipe? s) (format-pipe ident s)]
+            [(rx-name-ref? s) (format "~a" (rx-name-ref-name s))]
+            [(rx-stream-ref? s) (format-ref s)]
+            [(rx-stream-pair-ref? s) (format-pair-ref s)]
+            [(rx-custom? s) (format-custom ident s)]
+            [(rx-empty? s) "NEVER"]
+            [else (error "not implemented")]))
+    (define (format-pipe ident pipe)
+      (match pipe
+        [(rx-pipe stream ops)
+         (if (null? ops)
+             (format-stream ident stream)
+             (string-append (format-stream ident stream) ".pipe(\n" (format-operators (+ 2 ident) ops) (get-ident ident) ")"))]))
+    (define (format-custom ident custom)
+      (match custom
+        ([rx-custom stream name] (format "~a(~a)" name (format-stream ident stream)))))
+    (define (format-operator ident op)
+      (define (format-rx-start-with-undefined)
+        "startWith(undefined)")
+      (define (format-rx-buffer-count buffer-size start-buffer-every)
+        (format "bufferCount(~a, ~a)" buffer-size start-buffer-every))
+      (define (format-rx-map-shape from-shape to-shape)
+        (format "map((~a) => ~a)" (format-shape-with-bracket from-shape) (format-shape-with-bracket to-shape)))
+      (define (format-rx-with-latest-from streams)
+        (format "withLatestFrom(~a)" (format-stream-list streams)))
+      (define (format-rx-map-flat from-nested-shape to-shape)
+        (format "map(([~a]) => ~a)" (format-nested-shape from-nested-shape) (format-shape-with-bracket to-shape)))
+      (define (format-rx-filter from-shape arg)
+        (format "filter((~a) => ~a)" (format-shape-with-bracket from-shape) arg))
+      (define (format-rx-partition from-shape arg)
+        (format "partition((~a) => ~a)" (format-shape-with-bracket from-shape) arg))
+      (define (format-rx-ret-action from-shape return-val ident action)
+        (format "map((~a) => ~a => {\n~a~a})" (format-shape-with-bracket from-shape) return-val (format-imperative action (+ 2 ident)) (get-ident ident)))
+      (define (format-rx-switch-map from-shape body)
+        (format "switchMap((~a) => {\n~a~a})" (format-shape-with-bracket from-shape) (format-imperative body (+ 2 ident)) (get-ident ident)))
+      (define (format-imperative inst ident)
+        (define ident-str (get-ident ident))
+        (define identp2 (+ ident 2))
+        (define (format-imperative-bind inst)
+          (format "~aconst ~a = ~a;\n~a"
+                  ident-str
+                  (bind-name inst)
+                  (format-symbol (bind-body inst))
+                  (format-imperative (bind-inst inst) ident)))
+        (define (format-imperative-if inst)
+          (format "~aif (~a) {\n~a~a}\n"
+                  ident-str
+                  (if-arg inst)
+                  (format-imperative (if-branch inst) identp2)
+                  ident-str))
+        (define (format-imperative-if-else inst)
+          (format "~aif (~a) {\n~a~a} else {\n~a~a}\n"
+                  ident-str
+                  (if-else-arg inst)
+                  (format-imperative (if-else-then-branch inst) identp2)
+                  ident-str
+                  (format-imperative (if-else-else-branch inst) identp2)
+                  ident-str))
+        (define (format-imperative-return inst)
+          (format "~areturn ~a;\n" ident-str (return-arg inst)))
+        (define (format-imperative-empty inst)
+          (format "~areturn NEVER;\n" ident-str))
+        ((cond [(rxir-list? inst) (lambda (x) (format-rx-program-inner ident x))]
+               [(bind? inst) format-imperative-bind]
+               [(if? inst) format-imperative-if]
+               [(if-else? inst) format-imperative-if-else]
+               [(return? inst) format-imperative-return])
+         inst))
+       (match op
+         [(rx-start-with-undefined) (format-rx-start-with-undefined)]
+         [(rx-buffer-count buffer-size start-buffer-every) (format-rx-buffer-count buffer-size start-buffer-every)]
+         [(rx-map-shape from-shape to-shape) (format-rx-map-shape from-shape to-shape)]
+         [(rx-with-latest-from streams) (format-rx-with-latest-from streams)]
+         [(rx-map-flat from-nested-shape to-shape) (format-rx-map-flat from-nested-shape to-shape)]
+         [(rx-filter from-shape arg) (format-rx-filter from-shape arg)]
+         [(rx-partition from-shape arg) (format-rx-partition from-shape arg)]
+         [(rx-ret-action from-shape return-val action) (format-rx-ret-action from-shape return-val ident action)]
+         [(rx-switch-map from-shape body) (format-rx-switch-map from-shape body)]
+         [else (error "not implemented")]))
+    (define (format-operators ident ops)
+      (if (null? ops)
+          ""
+          (string-append (get-ident ident) (format-operator ident (car ops)) ",\n" (format-operators ident (cdr ops)))))
+    (define (format-inst ident inst)
+      (format "const ~a = ~a" (format-stream ident (rx-stream-ref inst)) (format-stream ident inst)))
+    (define (format-streams ident lst)
+      (if (null? lst)
+          ""
+          (string-append (get-ident ident) (format-inst ident (car lst)) ";\n" (format-streams ident (cdr lst)))))
+    (string-append (format-streams ident rx-inst-list) (format "~areturn ~a;\n" (get-ident ident) (format-stream ident (rx-stream-ref (last rx-inst-list))))))
+  (string-append "function " "compiled(" (format-symbol-list inputs) ") {\n" (format-rx-program-inner 2 rxir-list-input) "}\n"))
 
 (define (print-rx-program inputs rx-inst-list)
   (display (format-rx-program inputs rx-inst-list)))
