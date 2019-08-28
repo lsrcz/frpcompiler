@@ -34,7 +34,7 @@
 (define (build-custom name inst) (list 'custom name inst))
 (define (build-split bindings body) (list 'split bindings body))
 (define (build-new-stream body) (list 'new-stream body))
-(define (build-empty) (list 'empty))
+(define (build-empty) (list 'empty-stream))
 
 
 (define (if? body) (eq? (get-op body) 'if))
