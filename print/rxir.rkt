@@ -95,6 +95,13 @@
                                        (get-ident (+ ident 2))
                                        (get-ident (+ ident 2))
                                        (get-ident ident))]))
+    (define (format-action ident a)
+      (match a
+        [(rx-action action) (format "~a.pipe(\n~ascan((acc, cur) => cur(acc), undefined),\n~afilter(Boolean),\n~a)"
+                                    (format-stream ident action)
+                                    (get-ident (+ ident 2))
+                                    (get-ident (+ ident 2))
+                                    (get-ident ident))]))
     (define (format-ref r)
       (ref->str r))
     (define (format-pair-ref r)
@@ -108,6 +115,7 @@
             [(rx-stream-pair-ref? s) (format-pair-ref s)]
             [(rx-custom? s) (format-custom ident s)]
             [(rx-empty? s) "NEVER"]
+            [(rx-action? s) (format-action ident s)]
             [else (error "not implemented")]))
     (define (format-pipe ident pipe)
       (match pipe

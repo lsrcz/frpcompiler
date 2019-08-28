@@ -42,13 +42,25 @@
            (move
              (begin
                (let x (g (prev mode)))
+               (if x (return x))))))]
+        [spec2
+         (spec
+          '(mode move down)
+          'drawing
+          '(f g)
+          '()
+          '((move
+             (begin
+               (let x (g (prev mode)))
                (if x (return x))))))])
     (println (monad-desugar-spec spec1))
     (println (expand-spec (monad-desugar-spec spec1)))
-    (print-rx-program (compile spec1)))
+    (print-rx-program (compile spec1))
+    (print-rx-program (compile spec2)))
   (print-rx-program (compile drawing-spec))
   (print-rx-program (compile drawing-custom-spec))
   (print-rx-program (compile drawing-split-spec))
+
   )
 
                 

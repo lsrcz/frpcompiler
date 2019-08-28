@@ -28,13 +28,28 @@
       [(list 'new-stream body) (translate-new-stream constantlist body)]
       [_ (error "error pattern")]))
   (define (translate-new-stream constantlist body)
-    (define (gen-merge inst-list)
+    (define (gen-final-ret inst-list)
+      (define (purge-non-ret inst-list)
+        (define (iter inst-list-rev)
+          (let ([x (car inst-list-rev)])
+            (if (not (or (split-inst? x)
+                         (ret-action-inst? x)
+                         (ret-inst? x)))
+                (iter (cdr inst-list-rev))
+                inst-list-rev)))
+        (reverse (iter (reverse inst-list))))
       (let ([ret-list (filter (lambda (x) (or (split-inst? x)
                                               (if should-emit-action (ret-action-inst? x) (ret-inst? x))))
                               inst-list)])
-        (if should-emit-action
-            (append inst-list (list (merge-action-inst ret-list)))
-            (append inst-list (list (merge-inst ret-list))))))
+        (if (= (length ret-list) 1)
+            (let ([new-list (purge-non-ret inst-list)])
+              (if should-emit-action
+                  (append new-list (list (action-inst (car ret-list))))
+                  new-list))
+            (if should-emit-action
+                (append inst-list (list (merge-action-inst ret-list)))
+                (append inst-list (list (merge-inst ret-list)))))))
+
     (define (translate start-input constantlist inst)
       (define (search-inputs-map input)
         (define (iter inputs-map)
@@ -234,7 +249,7 @@
           '()
           (append (translate-one (car body))
                   (iter (cdr body)))))
-    (ir-list inputs-map (gen-merge (iter body)) constantlist))
+    (ir-list inputs-map (gen-final-ret (iter body)) constantlist))
   (translate-new-stream constantlist body))
 
 (define (translate-spec spec-input)

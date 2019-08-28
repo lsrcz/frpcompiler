@@ -88,6 +88,11 @@
           [(merge-action-inst to-merge)
            (rx-merge-action
             (map map-ref to-merge))]))
+      (define (emit-action ir)
+        (match ir
+          [(action-inst action-source)
+           (rx-action
+            (map-ref action-source))]))
       (define (emit-ret-action ir)
         (match ir
           [(ret-action-inst return-val action ref)
@@ -138,6 +143,7 @@
              [(custom-inst? ir) emit-custom]
              [(split-inst? ir) emit-split]
              [(empty-inst? ir) emit-empty]
+             [(action-inst? ir) emit-action]
              [else (error "not-implemented")])
        ir))
     (define (iter ir-list-input rxir-mapping)
