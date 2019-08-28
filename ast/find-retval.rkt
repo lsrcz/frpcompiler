@@ -30,25 +30,36 @@
         [(empty-stream? inst) #f]
         [(new-stream? inst) (return-val-found-multiple-deep? return-val (map cadr (new-stream-body inst)))]))
 
-(define (return-val-found-deep? return-val inst)
+(define (return-val-found-spec-deep? return-val inst)
   (or (return-val-found? return-val inst)
-      (cond [(bind? inst) (return-val-found-deep? return-val (bind-inst inst))]
+      (cond [(bind? inst) (return-val-found-spec-deep? return-val (bind-inst inst))]
             [(return? inst) #f]
-            [(if? inst) (return-val-found-deep? return-val (if-branch inst))]
-            [(if-else? inst) (or (return-val-found-deep? return-val (if-else-else-branch inst))
-                                 (return-val-found-deep? return-val (if-else-then-branch inst)))]
-            [(custom? inst) (return-val-found-deep? return-val (custom-body inst))]
+            [(if? inst) (return-val-found-spec-deep? return-val (if-branch inst))]
+            [(if-else? inst) (or (return-val-found-spec-deep? return-val (if-else-else-branch inst))
+                                 (return-val-found-spec-deep? return-val (if-else-then-branch inst)))]
+            [(custom? inst) (return-val-found-spec-deep? return-val (custom-body inst))]
             [(split? inst) (return-val-found-imperative? return-val (split-body inst))]
             [else (error "not implemented")])))
 
 (define (return-val-found-multiple-deep? return-val specs)
   (if (null? specs)
       #f
-      (or (return-val-found-deep? return-val (car specs))
+      (or (return-val-found-spec-deep? return-val (car specs))
           (return-val-found-multiple-deep? return-val (cdr specs)))))
+
+(define (return-val-found-spec-shadow? return-val inst)
+  (or (return-val-found? return-val inst)
+      (cond [(bind? inst) (return-val-found-spec-shadow? return-val (bind-inst inst))]
+            [(return? inst) #f]
+            [(if? inst) (return-val-found-spec-shadow? return-val (if-branch inst))]
+            [(if-else? inst) (or (return-val-found-spec-shadow? return-val (if-else-else-branch inst))
+                                 (return-val-found-spec-shadow? return-val (if-else-then-branch inst)))]
+            [(custom? inst) (return-val-found-spec-shadow? return-val (custom-body inst))]
+            [(split? inst) #f]
+            [else (error "not implemented")])))
 
 (define (return-val-found-multiple-shadow? return-val specs)
   (if (null? specs)
       #f
-      (or (return-val-found? return-val (car specs))
+      (or (return-val-found-spec-shadow? return-val (car specs))
           (return-val-found-multiple-shadow? return-val (cdr specs)))))

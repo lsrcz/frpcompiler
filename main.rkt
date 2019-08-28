@@ -44,6 +44,8 @@
 
   )
 
+(define (test-drawing) (print-rx-program (compile drawing-spec)))
+
 (define (test-action)
   (let ([spec1
          (spec
