@@ -148,7 +148,12 @@
       (define (format-rx-to-action return-val)
         (format "map((ret) => (~a) => ret)" return-val))
       (define (format-rx-scan-undefined from-shape return-val ident action)
-        (format "scan((~a, ~a) => {\n~a~a})" return-val (format-shape-with-bracket from-shape) (format-imperative action (+ 2 ident)) (get-ident ident)))
+        (format "scan((~a, ~a) => {\n~a~a}, undefined),\n~afilter(Boolean)"
+                return-val
+                (format-shape-with-bracket from-shape)
+                (format-imperative action (+ 2 ident))
+                (get-ident ident)
+                (get-ident ident)))
       (define (format-imperative inst ident)
         (define ident-str (get-ident ident))
         (define identp2 (+ ident 2))
