@@ -103,6 +103,16 @@
               (get-shape ref)
               return-val
               action)))]))
+      (define (emit-scan ir)
+        (match ir
+          [(scan-inst return-val action ref)
+           (rx-pipe
+            (map-ref ref)
+            (list
+             (rx-scan-undefined
+              (get-shape ref)
+              return-val
+              action)))]))
       (define (emit-custom ir)
         (match ir
           [(custom-inst name ref _)
@@ -157,6 +167,7 @@
              [(empty-inst? ir) emit-empty]
              [(action-inst? ir) emit-action]
              [(split-action-inst? ir) emit-split-action]
+             [(scan-inst? ir) emit-scan]
              [else (error "not-implemented")])
        ir))
     (define (iter ir-list-input rxir-mapping)

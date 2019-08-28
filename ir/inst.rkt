@@ -17,6 +17,7 @@
 (struct split-inst (bindings body ref) #:transparent)
 (struct split-action-inst (return-val bindings body ref) #:transparent)
 (struct action-inst (action-source) #:transparent)
+(struct scan-inst (return-val action ref) #:transparent)
 
 (struct ir-list (input-lst lst ref-table-lst) #:transparent)
 

@@ -147,6 +147,8 @@
         (format "switchMap((~a) => {\n~a~a})" (format-shape-with-bracket from-shape) (format-imperative body (+ 2 ident)) (get-ident ident)))
       (define (format-rx-to-action return-val)
         (format "map((ret) => (~a) => ret)" return-val))
+      (define (format-rx-scan-undefined from-shape return-val ident action)
+        (format "scan((~a, ~a) => {\n~a~a})" return-val (format-shape-with-bracket from-shape) (format-imperative action (+ 2 ident)) (get-ident ident)))
       (define (format-imperative inst ident)
         (define ident-str (get-ident ident))
         (define identp2 (+ ident 2))
@@ -191,6 +193,7 @@
          [(rx-ret-action from-shape return-val action) (format-rx-ret-action from-shape return-val ident action)]
          [(rx-switch-map from-shape body) (format-rx-switch-map from-shape body)]
          [(rx-to-action return-val) (format-rx-to-action return-val)]
+         [(rx-scan-undefined from-shape return-val action) (format-rx-scan-undefined from-shape return-val ident action)]
          [else (error "not implemented")]))
     (define (format-operators ident ops)
       (if (null? ops)

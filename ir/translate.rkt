@@ -45,7 +45,13 @@
         (if (= (length ret-list) 1)
             (let ([new-list (purge-non-ret inst-list)])
               (if should-emit-action
-                  (append new-list (list (action-inst (car ret-list))))
+                  (let* ([reversed (reverse new-list)]
+                         [last (car reversed)]
+                         [rest-rev (cdr reversed)])
+                    (match last
+                      [(ret-action-inst return-val action ref)
+                       (reverse (cons (scan-inst return-val action ref) rest-rev))]
+                      [_ (error "should not happen")]))
                   new-list))
             (if should-emit-action
                 (append inst-list (list (merge-action-inst ret-list)))
