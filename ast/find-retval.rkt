@@ -28,7 +28,7 @@
         [(if-else? inst) (or (return-val-found-imperative? return-val (if-else-then-branch inst))
                              (return-val-found-imperative? return-val (if-else-else-branch inst)))]
         [(empty-stream? inst) #f]
-        [(new-stream? inst) (return-val-found-multiple? return-val (map cadr (new-stream-body inst)))]))
+        [(new-stream? inst) (return-val-found-multiple-deep? return-val (map cadr (new-stream-body inst)))]))
 
 (define (return-val-found-deep? return-val inst)
   (or (return-val-found? return-val inst)
@@ -41,8 +41,14 @@
             [(split? inst) (return-val-found-imperative? return-val (split-body inst))]
             [else (error "not implemented")])))
 
-(define (return-val-found-multiple? return-val specs)
+(define (return-val-found-multiple-deep? return-val specs)
   (if (null? specs)
       #f
       (or (return-val-found-deep? return-val (car specs))
-          (return-val-found-multiple? return-val (cdr specs)))))
+          (return-val-found-multiple-deep? return-val (cdr specs)))))
+
+(define (return-val-found-multiple-shadow? return-val specs)
+  (if (null? specs)
+      #f
+      (or (return-val-found? return-val (car specs))
+          (return-val-found-multiple-shadow? return-val (cdr specs)))))

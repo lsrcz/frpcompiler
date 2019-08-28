@@ -63,5 +63,24 @@
 
   )
 
+(define (test-action)
+  (let ([spec1
+         (spec
+          '(mode down move)
+          'drawing
+          '(f g l n)
+          '()
+          '((mode
+             (split ((mode-snapshot mode)
+                     (down-snapshot down))
+                    (if-else (f mode-snapshot)
+                             (new-stream
+                              ((move (if-else (g drawing)
+                                              (return (l down-snapshot move))
+                                              (return (n drawing (prev move) move))))))
+                             (empty-stream))))
+            (down (if (g drawing) (return down)))))])
+    (print-rx-program (compile spec1))))
+
                 
      

@@ -21,6 +21,7 @@
 (struct rx-partition (from-shape arg) #:transparent)
 (struct rx-ret-action (from-shape return-val action) #:transparent)
 (struct rx-switch-map (from-shape body) #:transparent)
+(struct rx-to-action (return-val) #:transparent)
 
 (struct rxir-input-inst (name num inst) #:transparent)
 (struct rxir-list (input-insts lst) #:transparent)

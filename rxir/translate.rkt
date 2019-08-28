@@ -120,6 +120,18 @@
               (if (not (equal? (get-shape ref) binding-ori))
                   (list (rx-map-shape (get-shape ref) binding-ori) switch-map-inst)
                   (list switch-map-inst))))]))
+      (define (emit-split-action ir)
+        (match ir
+          [(split-action-inst output bindings body ref)
+           (let* ([binding-ori (map cadr bindings)]
+                  [binding-new (map car bindings)]
+                  [switch-map-inst (rx-switch-map binding-new (emit-imperative body))])
+             (rx-pipe
+              (map-ref ref)
+              (append (if (not (equal? (get-shape ref) binding-ori))
+                          (list (rx-map-shape (get-shape ref) binding-ori))
+                          (list))
+                      (list switch-map-inst (rx-to-action output)))))]))
       (define (emit-empty ir)
         (rx-empty))
       (define (emit-imperative inst)
@@ -144,6 +156,7 @@
              [(split-inst? ir) emit-split]
              [(empty-inst? ir) emit-empty]
              [(action-inst? ir) emit-action]
+             [(split-action-inst? ir) emit-split-action]
              [else (error "not-implemented")])
        ir))
     (define (iter ir-list-input rxir-mapping)

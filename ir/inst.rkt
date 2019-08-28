@@ -15,6 +15,7 @@
 (struct custom-inst (name ref shape) #:transparent)
 (struct empty-inst () #:transparent)
 (struct split-inst (bindings body ref) #:transparent)
+(struct split-action-inst (return-val bindings body ref) #:transparent)
 (struct action-inst (action-source) #:transparent)
 
 (struct ir-list (input-lst lst ref-table-lst) #:transparent)

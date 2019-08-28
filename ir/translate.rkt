@@ -15,7 +15,7 @@
 
 
 
-(define (translate-body inputs-map output funclist should-emit-action constantlist body)
+(define (translate-body inputs-map output funclist constantlist body)
   (define (translate-imperative constantlist body)
     (match body
       [(list 'bind name body inst)
@@ -25,9 +25,11 @@
       [(list 'if-else arg then-branch else-branch)
        (build-if-else arg (translate-imperative constantlist then-branch) (translate-imperative constantlist else-branch))]
       [(list 'empty-stream) (ir-list inputs-map (list (empty-inst)) constantlist)]
-      [(list 'new-stream body) (translate-new-stream constantlist body)]
+      [(list 'new-stream body)
+       (translate-new-stream constantlist body)]
       [_ (error "error pattern")]))
   (define (translate-new-stream constantlist body)
+    (define should-emit-action (return-val-found-multiple-shadow? output (map cadr body)))
     (define (gen-final-ret inst-list)
       (define (purge-non-ret inst-list)
         (define (iter inst-list-rev)
@@ -38,8 +40,7 @@
                 (iter (cdr inst-list-rev))
                 inst-list-rev)))
         (reverse (iter (reverse inst-list))))
-      (let ([ret-list (filter (lambda (x) (or (split-inst? x)
-                                              (if should-emit-action (ret-action-inst? x) (ret-inst? x))))
+      (let ([ret-list (filter (lambda (x) (or (split-inst? x) (split-action-inst? x) (ret-inst? x) (ret-action-inst? x)))
                               inst-list)])
         (if (= (length ret-list) 1)
             (let ([new-list (purge-non-ret inst-list)])
@@ -110,7 +111,7 @@
                        ref
                        (compute-intro-shape intro-list shape)))]
                  [split-ref (if new-intro-inst new-intro-inst ref)]
-                 [new-split-inst (split-inst
+                 [new-split-inst ((if should-emit-action (lambda (x y z) (split-action-inst output x y z)) split-inst)
                                   bindings
                                   (translate-imperative (append (map car bindings) constantlist) body)
                                   split-ref)])
@@ -337,9 +338,8 @@
        (prev-map-to-inputs-map (collect-prev inputs (analyze-prev-new-stream body)))]))
   (match spec-input
     [(spec inputs output funclist constantlist body)
-     (let ([should-emit-action (return-val-found-multiple? output (map cadr body))]
-           [input-map (get-inputs-map spec-input)])
-       (translate-body input-map output funclist should-emit-action constantlist body))]))
+     (let ([input-map (get-inputs-map spec-input)])
+       (translate-body input-map output funclist constantlist body))]))
 
 (define (main)
   (define spec
