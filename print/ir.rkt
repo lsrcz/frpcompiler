@@ -6,10 +6,30 @@
 (struct reg-inst (inst reg) #:transparent)
 
 (define (format-inst-list ir-list-input)
-      (define (get-ident ident)
-      (if (= ident 0)
-          ""
-          (string-append " " (get-ident (- ident 1)))))
+  (define (get-ident ident)
+    (if (= ident 0)
+        ""
+        (string-append " " (get-ident (- ident 1)))))
+
+      
+
+  
+  (define (format-inputs ident inputs)
+    (define (iter inputs)
+      (match inputs
+        [(list) ""]
+        [(cons inst nxt)
+         (string-append (get-ident ident)
+                        (match inst
+                          [(input-inst name num shape)
+                           (format "~a = input(~a, ~a) :: ~a"
+                                   (if (= num 0)
+                                       name
+                                       (format "~a~a" name num))  name num shape)])
+                        "\n" (iter nxt))]))
+    (let ([to-format (filter (match-lambda [(input-inst _ num _) (not (= num 0))]) inputs)])
+      (iter to-format)))
+      
   (define (format-inst-imperative ident imperative-inst)
     (match imperative-inst
       [(list 'bind name value next-inst)
@@ -29,7 +49,7 @@
                       (format-inst-imperative (+ 2 ident) else-branch)
                       (format "~a}\n" (get-ident ident)))]
       [(list 'empty-stream) (format "~areturn NEVER;\n" (get-ident ident))]
-      [(ir-list lst _) (format-inst-list-inner ident imperative-inst)]))
+      [(ir-list _ lst _) (format-inst-list-inner ident imperative-inst)]))
   (define (format-inst-list-inner ident ir-list-input)
     (define inst-list (ir-list-lst ir-list-input))
     (define ref-table-list (ir-list-ref-table-lst ir-list-input))
@@ -49,9 +69,17 @@
       (if (pair? reg)
           (format "~a[~a]" (car reg) (cdr reg))
           (format "~a" reg)))
+    (define (input-inst->str inst)
+      (match inst
+        [(input-inst name num _)
+         (if (= num 0)
+             name
+             (format "~a~a" name num))]))
     (define (inst->str inst)
-      (reg->str (inst->reg inst)))
-    (define (format-inst inst)
+      (if (input-inst? inst)
+          (input-inst->str inst)
+          (reg->str (inst->reg inst))))
+    (define (format-inst ident inst)
       (match inst
         [(input-inst name num shape) (format "~a = input(~a, ~a) :: ~a" (inst->str inst) name num shape)]
         [(intro-inst intro-lst ref shape) (format "~a = ~a.intro(~a) :: ~a" (inst->str inst) (inst->str ref) (map inst->str intro-lst) shape)]
@@ -73,10 +101,11 @@
     (define (iter inst-list)
       (if (null? inst-list)
           ""
-          (string-append (format "~a~a\n" (get-ident ident) (format-inst (car inst-list)))
+          (string-append (format "~a~a\n" (get-ident ident) (format-inst ident (car inst-list)))
                          (iter (cdr inst-list)))))
     (string-append (format "~a// ~a\n" (get-ident ident) ref-table-list) (iter inst-list)))
-  (format-inst-list-inner 0 ir-list-input))
+  (string-append (format-inputs 0 (ir-list-input-lst ir-list-input))
+                 (format-inst-list-inner 0 ir-list-input)))
 
 (define (print-inst-list ir-list-input)
   (display (format-inst-list ir-list-input)))

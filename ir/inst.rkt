@@ -16,7 +16,7 @@
 (struct empty-inst () #:transparent)
 (struct split-inst (bindings body ref) #:transparent)
 
-(struct ir-list (lst ref-table-lst) #:transparent)
+(struct ir-list (input-lst lst ref-table-lst) #:transparent)
 
 (define (get-shape inst)
   (match inst
