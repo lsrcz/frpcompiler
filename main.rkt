@@ -23,8 +23,6 @@
      (monad-desugar-spec
       spec)))))
 
-(define (print-with-spec rxir-list spec)
-  (print-rx-program (spec-inputs spec) rxir-list))
 
 
 (define (main)
@@ -47,10 +45,10 @@
                (if x (return x))))))])
     (println (monad-desugar-spec spec1))
     (println (expand-spec (monad-desugar-spec spec1)))
-    (print-with-spec (compile spec1) spec1))
-  (print-with-spec (compile drawing-spec) drawing-spec)
-  (print-with-spec (compile drawing-custom-spec) drawing-custom-spec)
-  (print-with-spec (compile drawing-split-spec) drawing-split-spec)
+    (print-rx-program (compile spec1)))
+  (print-rx-program (compile drawing-spec))
+  (print-rx-program (compile drawing-custom-spec))
+  (print-rx-program (compile drawing-split-spec))
   )
 
                 

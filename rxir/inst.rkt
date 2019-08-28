@@ -21,4 +21,5 @@
 (struct rx-ret-action (from-shape return-val action) #:transparent)
 (struct rx-switch-map (from-shape body) #:transparent)
 
-(struct rxir-list (lst) #:transparent)
+(struct rxir-input-inst (name num inst) #:transparent)
+(struct rxir-list (input-insts lst) #:transparent)

@@ -24,7 +24,7 @@
        (build-if arg (translate-imperative constantlist branch))]
       [(list 'if-else arg then-branch else-branch)
        (build-if-else arg (translate-imperative constantlist then-branch) (translate-imperative constantlist else-branch))]
-      [(list 'empty-stream) (ir-list (list (empty-inst)) constantlist)]
+      [(list 'empty-stream) (ir-list inputs-map (list (empty-inst)) constantlist)]
       [(list 'new-stream body) (translate-new-stream constantlist body)]
       [_ (error "error pattern")]))
   (define (translate-new-stream constantlist body)
@@ -323,8 +323,8 @@
   (match spec-input
     [(spec inputs output funclist constantlist body)
      (let ([should-emit-action (return-val-found-multiple? output (map cadr body))]
-           [input-map (get-inputs-map spec)])
-       (translate-body inputs output funclist should-emit-action constantlist body))]))
+           [input-map (get-inputs-map spec-input)])
+       (translate-body input-map output funclist should-emit-action constantlist body))]))
 
 (define (main)
   (define spec

@@ -5,8 +5,18 @@
 (provide print-rx-program)
 
 (struct reg-inst (inst reg) #:transparent)
-(define (format-rx-program inputs rxir-list-input)
-
+(define (format-rx-program rxir-list-input)
+  (define rxir-input-insts (rxir-list-input-insts rxir-list-input))
+  (define rxir-input-reg-list
+    (map (match-lambda
+           [(rxir-input-inst name num inst)
+            (reg-inst inst
+                      (if (= num 0)
+                          name
+                          (string->symbol(format "~a~a" name num))))])
+         rxir-input-insts))
+  (define inputs (map (match-lambda [(rxir-input-inst name _ _) name]) rxir-input-insts))
+  
   (define (format-comma-sep to-str)
     (define (iter lst)
       (if (null? lst)
@@ -44,17 +54,17 @@
     (if (= ident 0)
         ""
         (string-append " " (get-ident (- ident 1)))))
-  
-  (define (format-rx-program-inner ident rxir-list-input)
-    (define rx-inst-list
-      (match rxir-list-input
-        [(rxir-list lst) lst]))
+  (define (format-rx-program-inner ident rx-inst-list [gen-return #f])
     (define (add-reg inst-list num)
-      (if (null? inst-list)
-          '()
-          (cons
-           (reg-inst (car inst-list) (string->symbol (format "r~a" num)))
-           (add-reg (cdr inst-list) (+ 1 num)))))
+      (define (iter inst-list num)
+        (if (null? inst-list)
+            '()
+            (cons
+             (reg-inst (car inst-list) (string->symbol (format "r~a" num)))
+             (iter (cdr inst-list) (+ 1 num)))))
+      (append
+       rxir-input-reg-list
+       (iter inst-list num)))
     (define regged-inst-list (add-reg rx-inst-list 0))
     (define (inst->reg inst)
       (if (pair? inst)
@@ -154,7 +164,7 @@
           (format "~areturn ~a;\n" ident-str (return-arg inst)))
         (define (format-imperative-empty inst)
           (format "~areturn NEVER;\n" ident-str))
-        ((cond [(rxir-list? inst) (lambda (x) (format-rx-program-inner ident x))]
+        ((cond [(rxir-list? inst) (lambda (x) (format-rx-program-inner ident (rxir-list-lst x) #t))]
                [(bind? inst) format-imperative-bind]
                [(if? inst) format-imperative-if]
                [(if-else? inst) format-imperative-if-else]
@@ -181,12 +191,17 @@
       (if (null? lst)
           ""
           (string-append (get-ident ident) (format-inst ident (car lst)) ";\n" (format-streams ident (cdr lst)))))
-    (string-append (format-streams ident rx-inst-list) (format "~areturn ~a;\n" (get-ident ident) (format-stream ident (rx-stream-ref (last rx-inst-list))))))
-  (string-append "function " "compiled(" (format-symbol-list inputs) ") {\n" (format-rx-program-inner 2 rxir-list-input) "}\n"))
+    (string-append (format-streams ident rx-inst-list)
+                   (if gen-return
+                       (format "~areturn ~a;\n" (get-ident ident) (format-stream ident (rx-stream-ref (last rx-inst-list))))
+                       "")))
+  (string-append "function " "compiled(" (format-symbol-list inputs) ") {\n"
+                 (format-rx-program-inner 2 (map rxir-input-inst-inst (filter (match-lambda [(rxir-input-inst _ num _) (not (= num 0))]) rxir-input-insts)))
+                                                    
+                 (format-rx-program-inner 2 (rxir-list-lst rxir-list-input) #t) "}\n"))
 
-(define (print-rx-program inputs rx-inst-list)
-  (display (format-rx-program inputs rx-inst-list)))
-
+(define (print-rx-program rx-inst-list)
+  (display (format-rx-program rx-inst-list)))
 (define (main)
   (let* ([r1 (rx-name-ref 'a)]
          [r2 (rx-pipe (rx-name-ref 'b)
@@ -212,18 +227,19 @@
          [r10 (rx-merge-action (list (rx-stream-ref r8)))]
          [r11 (rx-pipe (rx-stream-ref r3)
                        (list (rx-ret-action '(c (prev c)) 'draw '(bind m (prev c) (if m (if-else m (return m) (return draw)))))))])
-    (print-rx-program '(a b c)
-                      (list r1
-                            r2
-                            r3
-                            r4
-                            r5
-                            r6
-                            r7
-                            r8
-                            r9
-                            r10
-                            r11
-                            ))))
+    (print-rx-program (rxir-list
+                       (list
+                        (rxir-input-inst 'a 0 r1)
+                        (rxir-input-inst 'b 1 r2)
+                        (rxir-input-inst 'c 1 r3))
+                       (list r4
+                             r5
+                             r6
+                             r7
+                             r8
+                             r9
+                             r10
+                             r11
+                             )))))
        
   
