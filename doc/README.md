@@ -2,4 +2,4 @@
 
 ## Table of contents
 
-- [Spec syntax](./spec_syntax.md)
+- [Syntax of the specification](./spec_syntax.md)
