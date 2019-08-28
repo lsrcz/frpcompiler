@@ -2,28 +2,9 @@
 
 (require "ast/expand.rkt")
 (require "ast/monad-desugar.rkt")
-(require "ir/translate.rkt")
-(require "ir/inst.rkt")
 (require "test/test-spec.rkt")
-(require "print/ir.rkt")
-(require "rxir/translate.rkt")
 (require "print/rxir.rkt")
-
-(provide (all-defined-out))
-
-(define (trace name x)
-  (println (format "trace: ~a: \n" name))
-  (println x)
-  x)
-
-(define (compile spec)
-  (emit-rxir
-   (translate-spec
-    (expand-spec
-     (monad-desugar-spec
-      spec)))))
-
-
+(require "compile.rkt")
 
 (define (main)
   (let ([spec1
