@@ -45,12 +45,12 @@
    '(f g l n)
    '()
    '((mode
-      (split ((mode-snapshot mode)
-              (down-snapshot down))
-             (if-else (f mode-snapshot)
+      (split ((mode_snapshot mode)
+              (down_snapshot down))
+             (if-else (f mode_snapshot)
                       (new-stream
                        ((move (if-else (g drawing)
-                                       (return (l down-snapshot move))
+                                       (return (l down_snapshot move))
                                        (return (n drawing (prev move) move))))))
                       (empty-stream)))))))
 

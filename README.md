@@ -25,12 +25,12 @@ The specification
  '(f g l n)
  '()
  '((mode
-    (split ((mode-snapshot mode)
-            (down-snapshot down))
-           (if-else (f mode-snapshot)
+    (split ((mode_snapshot mode)
+            (down_snapshot down))
+           (if-else (f mode_snapshot)
                     (new-stream
                      ((move (if-else (g drawing)
-                                     (return (l down-snapshot move))
+                                     (return (l down_snapshot move))
                                      (return (n drawing (prev move)
                                      move))))))
                     (empty-stream))))))
@@ -48,14 +48,14 @@ function compiled(mode, down, move) {
     withLatestFrom(down),
   );
   return r0.pipe(
-    switchMap(([mode-snapshot, down-snapshot]) => {
-      const _temp0 = f(mode-snapshot);
+    switchMap(([mode_snapshot, down_snapshot]) => {
+      const _temp0 = f(mode_snapshot);
       if (_temp0) {
         return move1.pipe(
           scan((drawing, [move, prev_move]) => {
             const _temp2 = g(drawing);
             if (_temp2) {
-              return l(down-snapshot, move);
+              return l(down_snapshot, move);
             } else {
               return n(drawing, prev_move, move);
             }
