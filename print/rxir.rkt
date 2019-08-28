@@ -153,11 +153,14 @@
         (define ident-str (get-ident ident))
         (define identp2 (+ ident 2))
         (define (format-imperative-bind inst)
-          (format "~aconst ~a = ~a;\n~a"
-                  ident-str
-                  (bind-name inst)
-                  (format-symbol (bind-body inst))
-                  (format-imperative (bind-inst inst) ident)))
+          (match inst
+            [(list 'bind name body (list 'return name)) (format "~areturn ~a;\n" ident-str (format-symbol body))]
+            [_
+             (format "~aconst ~a = ~a;\n~a"
+                     ident-str
+                     (bind-name inst)
+                     (format-symbol (bind-body inst))
+                     (format-imperative (bind-inst inst) ident))]))
         (define (format-imperative-if inst)
           (format "~aif (~a) {\n~a~a}\n"
                   ident-str
@@ -201,12 +204,14 @@
           (string-append (get-ident ident) (format-operator ident (car ops)) ",\n" (format-operators ident (cdr ops)))))
     (define (format-inst ident inst)
       (format "const ~a = ~a" (format-stream ident (rx-stream-ref inst)) (format-stream ident inst)))
+    (define (format-return ident inst)
+      (format "return ~a" (format-stream ident inst)))
     (define (format-streams ident lst)
-      (if (null? lst)
-          ""
-          (string-append (get-ident ident) (format-inst ident (car lst)) ";\n" (format-streams ident (cdr lst)))))
+      (cond [(null? lst) ""]
+            [(and gen-return (= (length lst) 1)) (string-append (get-ident ident) (format-return ident (car lst)) ";\n")]
+            [else (string-append (get-ident ident) (format-inst ident (car lst)) ";\n" (format-streams ident (cdr lst)))]))
     (string-append (format-streams ident rx-inst-list)
-                   (if gen-return
+                   #;(if gen-return
                        (format "~areturn ~a;\n" (get-ident ident) (format-stream ident (rx-stream-ref (last rx-inst-list))))
                        "")))
   (string-append "function " "compiled(" (format-symbol-list inputs) ") {\n"
