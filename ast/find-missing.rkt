@@ -26,39 +26,39 @@
       (merge-two (car missing-lst) (merge-missing (cdr missing-lst)))))
 
 
-(define (find-missing-var lst funclst return-val ref-list arg)
-  (define (find-missing-var-inner lst arg)
-    (let ([index (index-of lst arg)])
+(define (find-missing-var shape funclst return-val ref-list arg)
+  (define (find-missing-var-inner available-list arg)
+    (let ([index (index-of available-list arg)])
       (if index
           (all-found)
           (if (and (list? arg) (not (eq? (car arg) 'prev)))
               (merge-missing (cons (all-found)
                                    (for/list ([a arg])
-                                     (find-missing-var-inner lst a))))
+                                     (find-missing-var-inner available-list a))))
               (let ([removed (remove-prev arg)])
                 (if (eq? return-val removed)
                     (all-found)
                     (if (resolve-ref removed ref-list)
                         (not-found '() (list removed))
                         (not-found (list removed) '()))))))))
-  (match (find-missing-var-inner (append lst funclst) arg)
+  (match (find-missing-var-inner (append shape funclst) arg)
     [(all-found) (all-found)]
     [(not-found lst clist) (not-found (remove-duplicates lst) (remove-duplicates clist))]))
 
-(define (find-missing-var-deep lst funclst return-val ref-list inst)
+(define (find-missing-var-deep shape funclst return-val ref-list inst)
   (let* ([missing-in-arg
           (if (custom? inst)
               (all-found)
-              (find-missing-var lst funclst return-val ref-list
+              (find-missing-var shape funclst return-val ref-list
                                 ((cond [(bind? inst) bind-body]
                                        [(if? inst) if-arg]
                                        [(if-else? inst) if-else-arg]
                                        [(return? inst) return-arg])
                                  inst)))]
-         [new-lst (append (if (bind? inst) (list (bind-name inst)) '()) lst)]
+         [new-shape (append (if (bind? inst) (list (bind-name inst)) '()) shape)]
          [missing-in-next-inst-first
           (if (not (return? inst))
-              (find-missing-var-deep new-lst funclst return-val ref-list
+              (find-missing-var-deep new-shape funclst return-val ref-list
                                      ((cond [(bind? inst) bind-inst]
                                             [(if? inst) if-branch]
                                             [(if-else? inst) if-else-then-branch]
@@ -68,7 +68,7 @@
               (all-found))]
          [missing-in-next-inst-second
           (if (if-else? inst)
-              (find-missing-var-deep new-lst funclst return-val ref-list (if-else-else-branch inst))
+              (find-missing-var-deep new-shape funclst return-val ref-list (if-else-else-branch inst))
               (all-found))])
     (merge-missing (list missing-in-arg missing-in-next-inst-first missing-in-next-inst-second))))
 
