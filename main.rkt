@@ -1,6 +1,6 @@
 #lang racket
 
-(require "ast/expand.rkt")
+(require "ast/extract.rkt")
 (require "ast/monad-desugar.rkt")
 (require "test/test-spec.rkt")
 (require "print/rxir.rkt")
@@ -35,7 +35,7 @@
                (let x (g (prev mode)))
                (if x (return x))))))])
     (println (monad-desugar-spec spec1))
-    (println (expand-spec (monad-desugar-spec spec1)))
+    (println (extract-spec (monad-desugar-spec spec1)))
     (print-rx-program (compile spec1))
     (print-rx-program (compile spec2)))
   (print-rx-program (compile drawing-spec))

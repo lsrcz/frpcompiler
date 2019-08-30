@@ -4,61 +4,61 @@
 (require "../util/util.rkt")
 (require "../test/test-spec.rkt")
 
-(provide expand expand-spec)                                                                                                                                                
+(provide extract extract-spec)                                                                                                                                                
                                                                                                                                                                          
-(define (expand spec)
+(define (extract spec)
   (define temp-gen (get-temp-symbol-gen))
-  (define (expand-body body)
+  (define (extract-body body)
     (cond [(if? body)
-           (expand-if body)]
+           (extract-if body)]
           [(if-else? body)
-           (expand-if-else body)]
+           (extract-if-else body)]
           [(return? body)
-           (expand-return body)]
+           (extract-return body)]
           [(custom? body)
-           (expand-custom body)]
+           (extract-custom body)]
           [(split? body)
-           (expand-split body)]
+           (extract-split body)]
           [(new-stream? body)
-           (expand-new-stream body)]
+           (extract-new-stream body)]
           [(empty-stream? body)
            body]
           [(bind? body)
-           (expand-bind body)]))
-  (define (expand-if body)
+           (extract-bind body)]))
+  (define (extract-if body)
     (let ([arg (if-arg body)]
-          [expanded-branch (expand-body (if-branch body))])
+          [extracted-branch (extract-body (if-branch body))])
       (if (list? arg)
           (let ([temp (temp-gen)])
             (build-bind temp arg
-                        (build-if temp expanded-branch)))
-          (build-if arg expanded-branch))))
-  (define (expand-bind body)
-    (build-bind (bind-name body) (bind-body body) (expand-body (bind-inst body))))
-  (define (expand-if-else body)
+                        (build-if temp extracted-branch)))
+          (build-if arg extracted-branch))))
+  (define (extract-bind body)
+    (build-bind (bind-name body) (bind-body body) (extract-body (bind-inst body))))
+  (define (extract-if-else body)
     (let ([arg (if-else-arg body)]
-          [expanded-then (expand-body (if-else-then-branch body))]
-          [expanded-else (expand-body (if-else-else-branch body))])
+          [extracted-then (extract-body (if-else-then-branch body))]
+          [extracted-else (extract-body (if-else-else-branch body))])
       (if (list? arg)
           (let ([temp (temp-gen)])
             (build-bind temp arg
-                        (build-if-else temp expanded-then expanded-else)))
-          (build-if-else arg expanded-then expanded-else)
+                        (build-if-else temp extracted-then extracted-else)))
+          (build-if-else arg extracted-then extracted-else)
           )))
-  (define (expand-return body)
+  (define (extract-return body)
     (let ([arg (return-arg body)])
       (if (list? arg)
           (let ([temp (temp-gen)])
             (build-bind temp arg
                         (build-return temp)))
           body)))
-  (define (expand-custom body)
+  (define (extract-custom body)
     (let ([name (custom-name body)])
-      (build-custom name (expand-body (custom-body body)))))
-  (define (expand-split body)
+      (build-custom name (extract-body (custom-body body)))))
+  (define (extract-split body)
     (define (iter bindings built-bindings-rev body)
       (if (null? bindings)
-          (build-split (reverse built-bindings-rev) (expand-body body))
+          (build-split (reverse built-bindings-rev) (extract-body body))
           (let* ([cur (car bindings)]
                  [name (split-binding-name cur)]
                  [binding-body (split-binding-body cur)])
@@ -70,22 +70,22 @@
     (let* ([bindings (split-bindings body)]
            [body (split-body body)])
       (iter bindings '() body)))
-  (define (expand-new-stream body)
-    (let ([expanded-body (map expand (new-stream-body body))])
-      (build-new-stream expanded-body)))
+  (define (extract-new-stream body)
+    (let ([extracted-body (map extract (new-stream-body body))])
+      (build-new-stream extracted-body)))
   (let ([name (car spec)]
         [body (cadr spec)])
-    (list name (expand-body body))))
+    (list name (extract-body body))))
 
-(define (expand-spec spec-input)
+(define (extract-spec spec-input)
   (match spec-input
     [(spec inputs output funclist constantlist body)
-     (spec inputs output funclist constantlist (map expand body))]))
+     (spec inputs output funclist constantlist (map extract body))]))
 
 (require "monad-desugar.rkt")
 
 (define (main)
-  (println (expand-spec (monad-desugar-spec drawing-spec)))
-  (println (expand-spec (monad-desugar-spec drawing-split-spec))))
+  (println (extract-spec (monad-desugar-spec drawing-spec)))
+  (println (extract-spec (monad-desugar-spec drawing-split-spec))))
 
 

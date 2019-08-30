@@ -1,6 +1,6 @@
 #lang racket
 
-(require "ast/expand.rkt")
+(require "ast/extract.rkt")
 (require "ast/monad-desugar.rkt")
 (require "ir/translate.rkt")
 (require "rxir/translate.rkt")
@@ -10,6 +10,6 @@
 (define (compile spec)
   (emit-rxir
    (translate-spec
-    (expand-spec
+    (extract-spec
      (monad-desugar-spec
       spec)))))
