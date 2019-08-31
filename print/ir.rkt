@@ -93,6 +93,7 @@
         [(merge-action-inst to-merge) (format "~a = mergeact(~a)" (inst->str inst) (map inst->str to-merge))]
         [(custom-inst name ref shape) (format "~a = ~a(~a) :: ~a" (inst->str inst) name (inst->str ref) shape)]
         [(scan-inst return-val action ref) (format "~a = ~a.scan(~a => ~a)" (inst->str inst) (inst->str ref) return-val action)]
+        [(empty-inst) (format "~a = NEVER" (inst->str inst))]
         [(split-inst bindings imperative ref)
          (string-append
           (format "~a = ~a.split(~a => {\n" (inst->str inst) (inst->str ref) bindings)
