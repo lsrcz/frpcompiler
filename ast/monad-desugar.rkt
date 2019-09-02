@@ -47,7 +47,9 @@
       (build-split bindings desugared-body)))
   (define (desugar-new-stream body)
     (let ([desugared-body (map monad-desugar (new-stream-body body))])
-      (build-new-stream desugared-body)))
+      (if (new-stream-has-initial? body)
+          (build-new-stream-initial desugared-body (new-stream-initial body))
+          (build-new-stream desugared-body))))
   (define (desugar-custom body)
     (let ([name (custom-name body)]
           [desugared-inst (desugar-body (custom-body body))])

@@ -22,6 +22,8 @@
 (define split-binding-name car)
 (define split-binding-body cadr)
 (define new-stream-body cadr)
+(define (new-stream-has-initial? s) (not (null? (cddr s))))
+(define new-stream-initial caddr)
 
 
 (define (build-begin seq) (cons 'begin seq))
@@ -34,6 +36,7 @@
 (define (build-custom name inst) (list 'custom name inst))
 (define (build-split bindings body) (list 'split bindings body))
 (define (build-new-stream body) (list 'new-stream body))
+(define (build-new-stream-initial body initial) (list 'new-stream body initial))
 (define (build-empty) (list 'empty-stream))
 
 

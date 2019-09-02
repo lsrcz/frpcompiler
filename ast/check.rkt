@@ -22,7 +22,8 @@
             (check-begin-let-imperative else-branch))]
       [(cons 'begin lst) (check-begin-let-begin check-begin-let-imperative lst)]
       [(list 'empty-stream) #t]
-      [(list 'new-stream body) (check-begin-let body)]))
+      [(list 'new-stream body) (check-begin-let body)]
+      [(list 'new-stream body _) (check-begin-let body)]))
   (define (check-begin-let-one inst)
     (match inst
       [(list 'if _ branch) (check-begin-let-one branch)]
@@ -48,7 +49,8 @@
               (check-unique-split-imp-inst outter else-branch))]
         [(cons 'begin lst) (check-unique-split-imp-inst outter (last lst))]
         [(list 'empty-stream) #t]
-        [(list 'new-stream body) (check-unique-split-inner outter body)]))
+        [(list 'new-stream body) (check-unique-split-inner outter body)]
+        [(list 'new-stream body _) (check-unique-split-inner outter body)]))
     (define (check-unique-split-inst outter possible inst)
       (match inst
         [(list 'if _ branch) (check-unique-split-inst outter possible branch)]

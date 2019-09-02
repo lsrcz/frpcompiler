@@ -72,7 +72,14 @@
       (iter bindings '() body)))
   (define (extract-new-stream body)
     (let ([extracted-body (map extract (new-stream-body body))])
-      (build-new-stream extracted-body)))
+      (if (new-stream-has-initial? body)
+          (let ([initial (new-stream-initial body)])
+            (if (list? initial)
+                (let ([temp (temp-gen)])
+                  (build-bind temp initial
+                              (build-new-stream-initial extracted-body temp)))
+                (build-new-stream-initial extracted-body initial)))
+          (build-new-stream extracted-body))))
   (let ([name (car spec)]
         [body (cadr spec)])
     (list name (extract-body body))))

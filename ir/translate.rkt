@@ -27,8 +27,10 @@
       [(list 'empty-stream) (ir-list inputs-map (list (empty-inst)) constantlist)]
       [(list 'new-stream body)
        (translate-new-stream constantlist body)]
+      [(list 'new-stream body start-val)
+       (translate-new-stream constantlist body start-val)]
       [_ (error "error pattern")]))
-  (define (translate-new-stream constantlist body)
+  (define (translate-new-stream constantlist body [start-val #f])
     (define should-emit-action (return-val-found-multiple-shadow? output (map cadr body)))
     (define (gen-final-ret inst-list)
       (define (purge-non-ret inst-list)
@@ -50,12 +52,26 @@
                          [rest-rev (cdr reversed)])
                     (match last
                       [(ret-action-inst return-val action ref)
-                       (reverse (cons (scan-inst return-val action ref) rest-rev))]
+                       (if start-val
+                           (let* ([new-scan-start-inst (scan-start-inst return-val action start-val ref)]
+                                  [new-start-with-inst (start-with-inst start-val new-scan-start-inst)])
+                             (reverse (append (list new-start-with-inst new-scan-start-inst) rest-rev)))
+                           (reverse (cons (scan-inst return-val action ref) rest-rev)))]
                       [_ (error "should not happen")]))
-                  new-list))
+                  (if start-val
+                      (append new-list (list (start-with-inst start-val (last new-list))))
+                      new-list)))
             (if should-emit-action
-                (append inst-list (list (merge-action-inst ret-list)))
-                (append inst-list (list (merge-inst ret-list)))))))
+                (if start-val
+                    (let* ([new-merge-action-start-inst (merge-action-start-inst ret-list start-val)]
+                           [new-start-with-inst (start-with-inst start-val new-merge-action-start-inst)])
+                      (append inst-list (list new-merge-action-start-inst new-start-with-inst)))
+                    (append inst-list (list (merge-action-inst ret-list))))
+                (if start-val
+                    (let* ([new-merge-inst (merge-inst ret-list)]
+                           [new-start-with-inst (start-with-inst start-val new-merge-inst)])
+                      (append inst-list (list new-merge-inst new-start-with-inst)))
+                    (append inst-list (list (merge-inst ret-list))))))))
 
     (define (translate start-input constantlist inst)
       (define (search-inputs-map input)
@@ -289,7 +305,8 @@
             [(list 'if-else _ then-branch else-branch)
              (append (analyze-prev-imperative then-branch) (analyze-prev-imperative else-branch))]
             [(list 'empty-stream) '()]
-            [(list 'new-stream new-stream) (analyze-prev-new-stream new-stream)]))
+            [(list 'new-stream new-stream) (analyze-prev-new-stream new-stream)]
+            [(list 'new-stream new-stream _) (analyze-prev-new-stream new-stream)]))
         (cond [(if? inst)
                (analyze-prev-if inst)]
               [(if-else? inst)
@@ -398,34 +415,111 @@
                   (name-num-to-input-list (cdr name-list) (cdr num-list))))))
   (println "--1--")
   (print-inst-list (translate-body (name-num-to-input-list '(move) (list 1))
-                                   'drawing '(f) #f '() spec1))
+                                   'drawing '(f) '() spec1))
   (println "--2--")
   (print-inst-list (translate-body (name-num-to-input-list '(move) (list 0))
-                                   'drawing '(f) #f '() spec2))
+                                   'drawing '(f) '() spec2))
   (println "--3--")
   (print-inst-list (translate-body (name-num-to-input-list '(move down) (list 0 0))
-                                   'drawing '(f) #f '() spec3))
+                                   'drawing '(f) '() spec3))
   (println "--4--")
   (print-inst-list (translate-body (name-num-to-input-list '(move) (list 0))
-                                   'drawing '(f) #f '() spec4))
+                                   'drawing '(f) '() spec4))
   (println "--5--")
   (print-inst-list (translate-body (name-num-to-input-list '(move down) (list 0 0))
-                                   'drawing '(f g) #f '() spec5))
+                                   'drawing '(f g) '() spec5))
   (println "--6--")
   (print-inst-list (translate-body (name-num-to-input-list '(move down) (list 0 0))
-                                   'drawing '() #t '() spec6))
+                                   'drawing '() '() spec6))
   (println "--7--")
   (print-inst-list (translate-body (name-num-to-input-list '(move) (list 0))
-                                   'drawing '(f) #f '() spec7))
+                                   'drawing '(f) '() spec7))
   (println "--8--")
   (print-inst-list (translate-body (name-num-to-input-list '(move) (list 0))
-                                   'drawing '(f) #f '(b) spec8))
+                                   'drawing '(f) '(b) spec8))
   (println "--9--")
   (print-inst-list (translate-body (name-num-to-input-list '(move) (list 0))
-                                   'drawing '() #f '(b) spec9))
+                                   'drawing '() '(b) spec9))
   (println "--10--")
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
-                                   'drawing '(f g) #f '(p) spec10))
+                                   'drawing '(f g) '(p) spec10))
+
+
+  (define spec-scan1 '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (return mode))))))))))))))
+  (define spec-scan1-s '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (return mode))) a)))))))))))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan1))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan1-s))
+
+  (define spec-scan2 '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (return drawing))))))))))))))
+  (define spec-scan2-s '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (return drawing))) a)))))))))))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan2))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan2-s))
+
+  (define spec-scan3 '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (if-else mode (return mode) (return a)))))))))))))))
+  (define spec-scan3-s '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (if-else mode (return mode) (return a)))) a)))))))))))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan3))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan3-s))
+
+  (define spec-scan4 '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (if-else mode (return mode) (return drawing)))))))))))))))
+  (define spec-scan4-s '((move (bind _temp0 (f p)
+                                     (bind _temp1 (g q)
+                                           (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream ((mode (if-else mode (return mode) (return drawing)))) a)))))))))))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan4))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan4-s))
   )
   
     

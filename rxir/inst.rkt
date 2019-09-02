@@ -7,6 +7,7 @@
 (struct rx-stream-pair-ref (stream num) #:transparent)
 (struct rx-merge (stream-list) #:transparent)
 (struct rx-merge-action (stream-list) #:transparent)
+(struct rx-merge-action-start (stream-list start-val) #:transparent)
 (struct rx-pipe (stream ops) #:transparent)
 (struct rx-custom (stream name) #:transparent)
 (struct rx-empty () #:transparent)
@@ -23,6 +24,8 @@
 (struct rx-switch-map (from-shape body) #:transparent)
 (struct rx-to-action (return-val) #:transparent)
 (struct rx-scan-undefined (from-shape return-val action) #:transparent)
+(struct rx-scan (from-shape return-val start-val action) #:transparent)
+(struct rx-start-with (val) #:transparent)
 
 (struct rxir-input-inst (name num inst) #:transparent)
 (struct rxir-list (input-insts lst) #:transparent)

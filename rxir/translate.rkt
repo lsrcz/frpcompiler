@@ -49,6 +49,14 @@
                (if (not (equal? computed-shape shape))
                    (list (rx-map-flat computed-shape shape))
                    (list)))))]))
+      (define (emit-intro-const ir)
+        (match ir
+          [(intro-const-inst intro-lst ref shape)
+           (let [(shape (get-shape ref))]
+             (rx-pipe
+              (map-ref ref)
+              (list
+               (rx-map-shape shape ((if (list? shape) append cons) shape intro-lst)))))]))
       (define (emit-compute ir)
         (match ir
           [(compute-inst to-compute name ref shape)
@@ -88,6 +96,11 @@
           [(merge-action-inst to-merge)
            (rx-merge-action
             (map map-ref to-merge))]))
+      (define (emit-merge-action-start ir)
+        (match ir
+          [(merge-action-start-inst to-merge start-val)
+           (rx-merge-action-start
+            (map map-ref to-merge) start-val)]))
       (define (emit-action ir)
         (match ir
           [(action-inst action-source)
@@ -113,6 +126,25 @@
               (get-shape ref)
               return-val
               action)))]))
+      (define (emit-scan-start ir)
+        (match ir
+          [(scan-start-inst return-val action start-val ref)
+           (rx-pipe
+            (map-ref ref)
+            (list
+             (rx-scan
+              (get-shape ref)
+              return-val
+              start-val
+              action)))]))
+      (define (emit-start-with ir)
+        (match ir
+          [(start-with-inst val ref)
+           (rx-pipe
+            (map-ref ref)
+            (list
+             (rx-start-with
+              val)))]))
       (define (emit-custom ir)
         (match ir
           [(custom-inst name ref _)
@@ -155,6 +187,7 @@
           [(ir-list _ _ _) (emit-rxir-inner (ir-list-lst inst))]))
       ((cond [(input-inst? ir) emit-input]
              [(intro-inst? ir) emit-intro]
+             [(intro-const-inst? ir) emit-intro-const]
              [(compute-inst? ir) emit-compute]
              [(filter-inst? ir) emit-filter]
              [(partition-inst? ir) emit-partition]
@@ -168,7 +201,10 @@
              [(action-inst? ir) emit-action]
              [(split-action-inst? ir) emit-split-action]
              [(scan-inst? ir) emit-scan]
-             [else (error "not-implemented")])
+             [(merge-action-start-inst? ir) emit-merge-action-start]
+             [(scan-start-inst? ir) emit-scan-start]
+             [(start-with-inst? ir) emit-start-with]
+             [else (error ir)])
        ir))
     (define (iter ir-list-input rxir-mapping)
       (if (null? ir-list-input)
@@ -192,7 +228,11 @@
          [r9 (merge-action-inst (list r6 r7))]
          [r10 (ret-action-inst 'x '(bind e (g x) (return e)) (cons r6 0))]
          [r11 (custom-inst 'custom r5 '(b (prev b) a t))]
-         [r12 (split-inst '((x b)) (list 'bind 'e '(g x) (list 'if-else 'e (ir-list (list r1 r2) (list r3 r4) '()) (ir-list (list r1 r2) (list (empty-inst)) '()))) r11)])
+         [r12 (split-inst '((x b)) (list 'bind 'e '(g x) (list 'if-else 'e (ir-list (list r1 r2) (list r3 r4) '()) (ir-list (list r1 r2) (list (empty-inst)) '()))) r11)]
+         [r13 (merge-action-start-inst (list r6 r7) 'a)]
+         [r14 (scan-inst 'ret '(return ret) r1)]
+         [r15 (scan-start-inst 'ret '(return ret) 'a r1)]
+         [r16 (start-with-inst 'a r1)])
     (print-rx-program
      (emit-rxir
       (ir-list
@@ -209,6 +249,10 @@
         r9
         r10
         r11
-        r12)
+        r12
+        r13
+        r14
+        r15
+        r16)
        '())))))
     

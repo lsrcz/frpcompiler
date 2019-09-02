@@ -95,6 +95,14 @@
                                        (get-ident (+ ident 2))
                                        (get-ident (+ ident 2))
                                        (get-ident ident))]))
+    (define (format-merge-action-start ident m)
+      (match m
+        [(rx-merge-action-start lst start-val) (format "merge(~a).pipe(\n~ascan((acc, cur) => cur(acc), ~a),\n~afilter(Boolean),\n~a)"
+                                                       (format-stream-list lst)
+                                                       (get-ident (+ ident 2))
+                                                       (format-symbol start-val)
+                                                       (get-ident (+ ident 2))
+                                                       (get-ident ident))]))
     (define (format-action ident a)
       (match a
         [(rx-action action) (format "~a.pipe(\n~ascan((acc, cur) => cur(acc), undefined),\n~afilter(Boolean),\n~a)"
@@ -109,6 +117,7 @@
     (define (format-stream ident s)
       (cond [(rx-merge? s) (format-merge s)]
             [(rx-merge-action? s) (format-merge-action ident s)]
+            [(rx-merge-action-start? s) (format-merge-action-start ident s)]
             [(rx-pipe? s) (format-pipe ident s)]
             [(rx-name-ref? s) (format "~a" (rx-name-ref-name s))]
             [(rx-stream-ref? s) (format-ref s)]
@@ -154,6 +163,16 @@
                 (format-imperative action (+ 2 ident))
                 (get-ident ident)
                 (get-ident ident)))
+      (define (format-rx-scan from-shape return-val start-val ident action)
+        (format "scan((~a, ~a) => {\n~a~a}, ~a),\n~afilter(Boolean)"
+                return-val
+                (format-shape-with-bracket from-shape)
+                (format-imperative action (+ 2 ident))
+                (get-ident ident)
+                (format-symbol start-val)
+                (get-ident ident)))
+      (define (format-rx-start-with val)
+        (format "startWith(~a)" val))
       (define (format-imperative inst ident)
         (define ident-str (get-ident ident))
         (define identp2 (+ ident 2))
@@ -202,6 +221,8 @@
          [(rx-switch-map from-shape body) (format-rx-switch-map from-shape body)]
          [(rx-to-action return-val) (format-rx-to-action return-val)]
          [(rx-scan-undefined from-shape return-val action) (format-rx-scan-undefined from-shape return-val ident action)]
+         [(rx-scan from-shape return-val start-val action) (format-rx-scan from-shape return-val start-val ident action)]
+         [(rx-start-with val) (format-rx-start-with val)]
          [else (error "not implemented")]))
     (define (format-operators ident ops)
       (if (null? ops)

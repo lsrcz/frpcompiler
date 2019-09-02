@@ -91,8 +91,11 @@
         [(ret-action-inst return-val action ref) (format "~a = ~a.retact(~a => ~a)" (inst->str inst) (inst->str ref) return-val action)]
         [(merge-inst to-merge) (format "~a = merge(~a)" (inst->str inst) (map inst->str to-merge))]
         [(merge-action-inst to-merge) (format "~a = mergeact(~a)" (inst->str inst) (map inst->str to-merge))]
+        [(merge-action-start-inst to-merge start-val) (format "~a = mergeact(~a, ~a)" (inst->str inst) (map inst->str to-merge) start-val)]
         [(custom-inst name ref shape) (format "~a = ~a(~a) :: ~a" (inst->str inst) name (inst->str ref) shape)]
         [(scan-inst return-val action ref) (format "~a = ~a.scan(~a => ~a)" (inst->str inst) (inst->str ref) return-val action)]
+        [(scan-start-inst return-val action start-val ref) (format "~a = ~a.scan(~a => ~a, ~a)" (inst->str inst) (inst->str ref) return-val action start-val)]
+        [(start-with-inst val ref) (format "~a = ~a.startwith(~a)" (inst->str inst) (inst->str ref) val)]
         [(empty-inst) (format "~a = NEVER" (inst->str inst))]
         [(split-inst bindings imperative ref)
          (string-append

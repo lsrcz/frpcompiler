@@ -11,6 +11,7 @@
 (struct ret-inst (arg ref) #:transparent)
 (struct merge-inst (to-merge) #:transparent)
 (struct merge-action-inst (to-merge) #:transparent)
+(struct merge-action-start-inst (to-merge start-val) #:transparent)
 (struct ret-action-inst (return-val action ref) #:transparent)
 (struct custom-inst (name ref shape) #:transparent)
 (struct empty-inst () #:transparent)
@@ -18,6 +19,9 @@
 (struct split-action-inst (return-val bindings body ref) #:transparent)
 (struct action-inst (action-source) #:transparent)
 (struct scan-inst (return-val action ref) #:transparent)
+(struct scan-start-inst (return-val action start-val ref) #:transparent)
+(struct start-with-inst (val ref) #:transparent)
+
 
 (struct ir-list (input-lst lst ref-table-lst) #:transparent)
 
