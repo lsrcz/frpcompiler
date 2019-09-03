@@ -275,9 +275,7 @@
            (let ([new-glb-env (advance (struct-copy global-env glb-env [return-val 'undefined]))])
              (match new-glb-env
                [(global-env _ _ _ output _ return-val _)
-                (if (undefined? return-val)
-                    (cons (empty-event) (construct-list new-glb-env))
-                    (cons (event output return-val) (construct-list new-glb-env)))])))]))
+                (cons (if (undefined? return-val) (empty-event) (event output return-val)) (construct-list new-glb-env))])))]))
   (match spec-input
     [(spec inputs output _ _ body)
      (let ([glb-env (global-env trace 0 inputs output 'undefined 'undefined (list (sub bindings (analyze-new-stream body))))])

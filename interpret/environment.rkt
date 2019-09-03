@@ -26,7 +26,21 @@
 (define (get-event-by-time trace time)
   (list-ref (trace-event-lst trace) time))
 (define (get-value trace time name prev-num)
-  (let ([got (filter
+  (define (iter num remaining)
+    (if (null? remaining)
+        (not-found)
+        (let ([cur (car remaining)]
+              [rest (cdr remaining)])
+          (let ([name-eq (and (not (empty-event? cur)) (eq? (event-name cur) name))]
+                [num-zero (= num 0)])
+            (if name-eq
+                (if num-zero
+                    (resolved (event-value cur))
+                    (iter (- num 1) rest))
+                (iter num rest))))))
+  (let* ([remaining (reverse (take (trace-event-lst trace) (+ 1 time)))])
+    (iter prev-num remaining)))
+  #|(let ([got (filter
               (match-lambda
                 [(event name-event _)
                  (eq? name-event name)]
@@ -34,7 +48,7 @@
               (take (trace-event-lst trace) (+ 1 time)))])
     (if (<= (length got) prev-num)
         (not-found)
-        (resolved (event-value (list-ref (reverse got) prev-num))))))
+        (resolved (event-value (list-ref (reverse got) prev-num))))))|#
 
 (define (resolve-environment env sym [only-constant #f])
   (define (resolve-input trace sym time)
@@ -149,7 +163,8 @@
                                             (remove-sub stream-body (global-env-active-sub glb-env))]))))
       env))
 
-(define (main)
+
+(define (main-env)
   (define tr
     (trace
      (list
@@ -203,6 +218,7 @@
      '(a b)
      'x
      -100
+     0
      '())
   )
   (define loc-env
