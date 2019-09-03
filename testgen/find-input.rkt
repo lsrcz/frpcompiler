@@ -126,7 +126,7 @@
         (event 'c 2)
         (event 'b 1)
         (event 'c 3)
-        (event 'a 0)
+        #|(event 'a 0)
         (event 'c 1)
         (event 'b 0)
         (event 'c 2)
@@ -139,7 +139,7 @@
         (event 'b 1)
         (event 'c 3)
         (event 'a 0)
-        (event 'c 3)
+        (event 'c 3)|#
 
         )))
     (define sym-trace (get-symbolic-trace
@@ -150,7 +150,69 @@
 
     (define m (find-input spec-input binding-input sym-trace (interpret-spec spec-input concrete-trace binding-input)))
     (displayln (evaluate sym-trace m)))
-  (test-case6)
+  ;(test-case6)
+
+  (define (test-case7)
+    (define spec-input (spec '(a b) 'd '(add1 + - not >) '(t x)
+                       '((a (split ((a1 (add1 a)))
+                                   (if (> a1 t)
+                                       (new-stream ((b (if-else (undefined? d) (return (add1 (+ a1 b))) (return (+ b d))))))))))))
+    (define binding-input (list
+                           (binding 'add1 add1)
+                           (binding '+ +)
+                           (binding '- -)
+                           (binding 'not not)
+                           (binding 'undefined? undefined?)
+                           (binding '> >)
+                           (binding 't 1)
+                           (binding 'x 1)
+                           (binding 'undefined 'undefined)))
+    (define concrete-trace
+      (trace
+       (list
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 0)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 1)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 2)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 0)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 1)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 2)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 0)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 1)
+        (event 'b 10)
+        (event 'b 11)
+        (event 'a 2)
+        (event 'b 10)
+        (event 'b 11)
+
+        )))
+    (define sym-trace (get-symbolic-trace
+                       (list (cons 'a integer-constructor)
+                             (cons 'b integer-constructor))
+                       (length (trace-event-lst concrete-trace))))
+
+    (define m (find-input spec-input binding-input sym-trace (interpret-spec spec-input concrete-trace binding-input)))
+    (displayln (evaluate sym-trace m)))
+  (test-case7)
 
 
   )
