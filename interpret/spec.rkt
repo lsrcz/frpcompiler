@@ -258,13 +258,12 @@
 (define (interpret-spec spec-input trace bindings)
   (define (advance glb-env)
     (define (iter active-sub glb-env)
-      (if (null? active-sub)
-          glb-env
-          (match active-sub
-            [(list-rest (sub bindings body) rest)
-             (let ([env (environment glb-env (local-env '() bindings))])
-               (match ((analyzed-value-call body) env)
-                 [(environment new-glb-env _) (iter (cdr active-sub) new-glb-env)]))])))
+      (match active-sub
+        [(list) glb-env]
+        [(cons (sub bindings body) rest)
+         (let ([env (environment glb-env (local-env '() bindings))])
+           (match ((analyzed-value-call body) env)
+             [(environment new-glb-env _) (iter (cdr active-sub) new-glb-env)]))]))
     (match glb-env
       [(global-env _ _ _ _ _ _ active-sub) (advance-time-glb (iter active-sub glb-env))]))
   (define (construct-list glb-env)

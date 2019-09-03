@@ -27,28 +27,18 @@
   (list-ref (trace-event-lst trace) time))
 (define (get-value trace time name prev-num)
   (define (iter num remaining)
-    (if (null? remaining)
-        (not-found)
-        (let ([cur (car remaining)]
-              [rest (cdr remaining)])
-          (let ([name-eq (and (not (empty-event? cur)) (eq? (event-name cur) name))]
-                [num-zero (= num 0)])
-            (if name-eq
-                (if num-zero
-                    (resolved (event-value cur))
-                    (iter (- num 1) rest))
-                (iter num rest))))))
+    (match remaining
+      [(list) (not-found)]
+      [(cons cur rest)
+       (let ([name-eq (and (not (empty-event? cur)) (eq? (event-name cur) name))]
+             [num-zero (= num 0)])
+         (if name-eq
+             (if num-zero
+                 (resolved (event-value cur))
+                 (iter (- num 1) rest))
+             (iter num rest)))]))
   (let* ([remaining (reverse (take (trace-event-lst trace) (+ 1 time)))])
     (iter prev-num remaining)))
-  #|(let ([got (filter
-              (match-lambda
-                [(event name-event _)
-                 (eq? name-event name)]
-                [(empty-event) #f])
-              (take (trace-event-lst trace) (+ 1 time)))])
-    (if (<= (length got) prev-num)
-        (not-found)
-        (resolved (event-value (list-ref (reverse got) prev-num))))))|#
 
 (define (resolve-environment env sym [only-constant #f])
   (define (resolve-input trace sym time)
@@ -145,23 +135,23 @@
                                                 (global-env-active-sub glb-env))])))))
 
 (define (unsubscribe stream-body env)
-  (define (remove-sub stream-body active-sub)
-    (if (null? active-sub)
-        '()
-        (match (car active-sub)
-          [(sub _ body)
-           (if (eq? body stream-body)
-               (cdr active-sub)
-               (cons (car active-sub) (remove-sub stream-body (cdr active-sub))))])))
-  (if (is-subscribed? stream-body (environment-glb-env env))
+  (define (remove-sub active-sub)
+    (match active-sub
+      [(list) '()]
+      [(cons cur rest)
+       (match cur
+         [(sub _ body)
+          (if (eq? body stream-body)
+              rest
+              (cons cur (remove-sub rest)))])]))
+  ;(if (is-subscribed? stream-body (environment-glb-env env))
       (let ([unsubed-env ((analyzed-value-unsub stream-body) env)])
         (update-glb-env
          unsubed-env
-         (let ([glb-env (environment-glb-env unsubed-env)]
-               [loc-env (environment-loc-env unsubed-env)])
+         (let ([glb-env (environment-glb-env unsubed-env)])
            (struct-copy global-env glb-env [active-sub
-                                            (remove-sub stream-body (global-env-active-sub glb-env))]))))
-      env))
+                                            (remove-sub (global-env-active-sub glb-env))])))))
+      ;env))
 
 
 (define (main-env)
