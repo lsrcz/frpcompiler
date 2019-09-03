@@ -21,6 +21,10 @@
            (extract-split body)]
           [(new-stream? body)
            (extract-new-stream body)]
+          [(new-stream-initial? body)
+           (extract-new-stream-initial body)]
+          [(new-stream-seed? body)
+           (extract-new-stream-seed body)]
           [(empty-stream? body)
            body]
           [(bind? body)
@@ -72,14 +76,23 @@
       (iter bindings '() body)))
   (define (extract-new-stream body)
     (let ([extracted-body (map extract (new-stream-body body))])
-      (if (new-stream-has-initial? body)
-          (let ([initial (new-stream-initial body)])
-            (if (list? initial)
-                (let ([temp (temp-gen)])
-                  (build-bind temp initial
-                              (build-new-stream-initial extracted-body temp)))
-                (build-new-stream-initial extracted-body initial)))
-          (build-new-stream extracted-body))))
+          (build-new-stream extracted-body)))
+  (define (extract-new-stream-initial body)
+    (let ([extracted-body (map extract (new-stream-initial-body body))]
+          [initial (new-stream-initial-initial body)])
+      (if (list? initial)
+          (let ([temp (temp-gen)])
+            (build-bind temp initial
+                        (build-new-stream-initial extracted-body temp)))
+          (build-new-stream-initial extracted-body initial))))
+  (define (extract-new-stream-seed body)
+    (let ([extracted-body (map extract (new-stream-seed-body body))]
+          [seed (new-stream-seed-seed body)])
+      (if (list? seed)
+          (let ([temp (temp-gen)])
+            (build-bind temp seed
+                        (build-new-stream-seed extracted-body temp)))
+          (build-new-stream-seed extracted-body seed))))
   (let ([name (car spec)]
         [body (cadr spec)])
     (list name (extract-body body))))

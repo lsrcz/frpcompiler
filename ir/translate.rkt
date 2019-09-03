@@ -27,10 +27,12 @@
       [(list 'empty-stream) (ir-list inputs-map (list (empty-inst)) constantlist)]
       [(list 'new-stream body)
        (translate-new-stream constantlist body)]
-      [(list 'new-stream body start-val)
-       (translate-new-stream constantlist body start-val)]
+      [(list 'new-stream-initial body start-val)
+       (translate-new-stream constantlist body start-val #t)]
+      [(list 'new-stream-seed body start-val)
+       (translate-new-stream constantlist body start-val #f)]
       [_ (error "error pattern")]))
-  (define (translate-new-stream constantlist body [start-val #f])
+  (define (translate-new-stream constantlist body [start-val #f] [should-start-with #f])
     (define should-emit-action (return-val-found-multiple-shadow? output (map cadr body)))
     (define (gen-final-ret inst-list)
       (define (purge-non-ret inst-list)
@@ -55,19 +57,23 @@
                        (if start-val
                            (let* ([new-scan-start-inst (scan-start-inst return-val action start-val ref)]
                                   [new-start-with-inst (start-with-inst start-val new-scan-start-inst)])
-                             (reverse (append (list new-start-with-inst new-scan-start-inst) rest-rev)))
+                             (if should-start-with
+                                 (reverse (append (list new-start-with-inst new-scan-start-inst) rest-rev))
+                                 (reverse (cons new-scan-start-inst rest-rev))))
                            (reverse (cons (scan-inst return-val action ref) rest-rev)))]
                       [_ (error "should not happen")]))
-                  (if start-val
+                  (if (and start-val should-start-with)
                       (append new-list (list (start-with-inst start-val (last new-list))))
                       new-list)))
             (if should-emit-action
                 (if start-val
                     (let* ([new-merge-action-start-inst (merge-action-start-inst ret-list start-val)]
                            [new-start-with-inst (start-with-inst start-val new-merge-action-start-inst)])
-                      (append inst-list (list new-merge-action-start-inst new-start-with-inst)))
+                      (if should-start-with
+                          (append inst-list (list new-merge-action-start-inst new-start-with-inst))
+                          (append inst-list (list new-merge-action-start-inst))))
                     (append inst-list (list (merge-action-inst ret-list))))
-                (if start-val
+                (if (and start-val should-start-with)
                     (let* ([new-merge-inst (merge-inst ret-list)]
                            [new-start-with-inst (start-with-inst start-val new-merge-inst)])
                       (append inst-list (list new-merge-inst new-start-with-inst)))
@@ -452,15 +458,25 @@
                                                       (if _temp2
                                                           (bind _temp3 (g b)
                                                                 (if _temp3 (new-stream ((mode (return mode))))))))))))))
+  (define spec-scan1-i '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream-initial ((mode (return mode))) a)))))))))))
   (define spec-scan1-s '((move (bind _temp0 (f p)
                                    (bind _temp1 (g q)
                                          (split ((a _temp0) (b _temp1) (c mode))
                                                 (bind _temp2 (f a)
                                                       (if _temp2
                                                           (bind _temp3 (g b)
-                                                                (if _temp3 (new-stream ((mode (return mode))) a)))))))))))
+                                                                (if _temp3 (new-stream-seed ((mode (return mode))) a)))))))))))
+  (println "---1---")
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan1))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan1-i))
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan1-s))
 
@@ -471,15 +487,25 @@
                                                       (if _temp2
                                                           (bind _temp3 (g b)
                                                                 (if _temp3 (new-stream ((mode (return drawing))))))))))))))
+  (define spec-scan2-i '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream-initial ((mode (return drawing))) a)))))))))))
   (define spec-scan2-s '((move (bind _temp0 (f p)
                                    (bind _temp1 (g q)
                                          (split ((a _temp0) (b _temp1) (c mode))
                                                 (bind _temp2 (f a)
                                                       (if _temp2
                                                           (bind _temp3 (g b)
-                                                                (if _temp3 (new-stream ((mode (return drawing))) a)))))))))))
+                                                                (if _temp3 (new-stream-seed ((mode (return drawing))) a)))))))))))
+  (println "---2---")
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan2))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan2-i))
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan2-s))
 
@@ -490,15 +516,25 @@
                                                       (if _temp2
                                                           (bind _temp3 (g b)
                                                                 (if _temp3 (new-stream ((mode (if-else mode (return mode) (return a)))))))))))))))
+  (define spec-scan3-i '((move (bind _temp0 (f p)
+                                   (bind _temp1 (g q)
+                                         (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream-initial ((mode (if-else mode (return mode) (return a)))) a)))))))))))
   (define spec-scan3-s '((move (bind _temp0 (f p)
                                    (bind _temp1 (g q)
                                          (split ((a _temp0) (b _temp1) (c mode))
                                                 (bind _temp2 (f a)
                                                       (if _temp2
                                                           (bind _temp3 (g b)
-                                                                (if _temp3 (new-stream ((mode (if-else mode (return mode) (return a)))) a)))))))))))
+                                                                (if _temp3 (new-stream-seed ((mode (if-else mode (return mode) (return a)))) a)))))))))))
+  (println "---3---")
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan3))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan3-i))
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan3-s))
 
@@ -509,15 +545,25 @@
                                                       (if _temp2
                                                           (bind _temp3 (g b)
                                                                 (if _temp3 (new-stream ((mode (if-else mode (return mode) (return drawing)))))))))))))))
+  (define spec-scan4-i '((move (bind _temp0 (f p)
+                                     (bind _temp1 (g q)
+                                           (split ((a _temp0) (b _temp1) (c mode))
+                                                (bind _temp2 (f a)
+                                                      (if _temp2
+                                                          (bind _temp3 (g b)
+                                                                (if _temp3 (new-stream-initial ((mode (if-else mode (return mode) (return drawing)))) a)))))))))))
   (define spec-scan4-s '((move (bind _temp0 (f p)
                                      (bind _temp1 (g q)
                                            (split ((a _temp0) (b _temp1) (c mode))
                                                 (bind _temp2 (f a)
                                                       (if _temp2
                                                           (bind _temp3 (g b)
-                                                                (if _temp3 (new-stream ((mode (if-else mode (return mode) (return drawing)))) a)))))))))))
+                                                                (if _temp3 (new-stream-seed ((mode (if-else mode (return mode) (return drawing)))) a)))))))))))
+  (println "---4---")
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan4))
+  (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
+                                   'drawing '(f g) '(p) spec-scan4-i))
   (print-inst-list (translate-body (name-num-to-input-list '(move mode q) (list 0 0 0))
                                    'drawing '(f g) '(p) spec-scan4-s))
   )

@@ -28,7 +28,9 @@
         [(if-else? inst) (or (return-val-found-imperative? return-val (if-else-then-branch inst))
                              (return-val-found-imperative? return-val (if-else-else-branch inst)))]
         [(empty-stream? inst) #f]
-        [(new-stream? inst) (return-val-found-multiple-deep? return-val (map cadr (new-stream-body inst)))]))
+        [(new-stream? inst) (return-val-found-multiple-deep? return-val (map cadr (new-stream-body inst)))]
+        [(new-stream-initial? inst) (return-val-found-multiple-deep? return-val (map cadr (new-stream-initial-body inst)))]
+        [(new-stream-seed? inst) (return-val-found-multiple-deep? return-val (map cadr (new-stream-seed-body inst)))]))
 
 (define (return-val-found-spec-deep? return-val inst)
   (or (return-val-found? return-val inst)

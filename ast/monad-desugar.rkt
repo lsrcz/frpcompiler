@@ -20,6 +20,10 @@
            (desugar-split body)]
           [(new-stream? body)
            (desugar-new-stream body)]
+          [(new-stream-initial? body)
+           (desugar-new-stream-initial body)]
+          [(new-stream-seed? body)
+           (desugar-new-stream-seed body)]
           [else body]))
   (define (desugar-if body)
     (let ([arg (if-arg body)]
@@ -47,9 +51,13 @@
       (build-split bindings desugared-body)))
   (define (desugar-new-stream body)
     (let ([desugared-body (map monad-desugar (new-stream-body body))])
-      (if (new-stream-has-initial? body)
-          (build-new-stream-initial desugared-body (new-stream-initial body))
-          (build-new-stream desugared-body))))
+      (build-new-stream desugared-body)))
+  (define (desugar-new-stream-initial body)
+    (let ([desugared-body (map monad-desugar (new-stream-initial-body body))])
+      (build-new-stream-initial desugared-body (new-stream-initial-initial body))))
+  (define (desugar-new-stream-seed body)
+    (let ([desugared-body (map monad-desugar (new-stream-seed-body body))])
+      (build-new-stream-seed desugared-body (new-stream-seed-seed body))))
   (define (desugar-custom body)
     (let ([name (custom-name body)]
           [desugared-inst (desugar-body (custom-body body))])

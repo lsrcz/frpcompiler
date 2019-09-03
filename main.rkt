@@ -124,7 +124,7 @@
              (split ((mode-snapshot mode)
                      (down-snapshot down))
                     (if (f mode-snapshot)
-                        (new-stream
+                        (new-stream-initial
                          ((move (return move)))
                          (g down-snapshot)))))))]
         [spec-act-init-one
@@ -137,7 +137,7 @@
              (split ((mode-snapshot mode)
                      (down-snapshot down))
                     (if (f mode-snapshot)
-                        (new-stream
+                        (new-stream-initial
                          ((move (return drawing)))
                          (g down-snapshot)))))))]
         [spec-no-act-init-mul
@@ -150,7 +150,7 @@
              (split ((mode-snapshot mode)
                      (down-snapshot down))
                     (if (f mode-snapshot)
-                        (new-stream
+                        (new-stream-initial
                          ((move (if-else down-snapshot (return move) (return down-snapshot))))
                          (g down-snapshot)))))))]
         [spec-act-init-mul
@@ -163,7 +163,59 @@
              (split ((mode-snapshot mode)
                      (down-snapshot down))
                     (if (f mode-snapshot)
-                        (new-stream
+                        (new-stream-initial
+                         ((move (if-else down-snapshot (return move) (return drawing))))
+                         (g down-snapshot)))))))]
+        [spec-no-act-seed-one
+         (spec
+          '(mode down move)
+          'drawing
+          '(f g l n)
+          '()
+          '((mode
+             (split ((mode-snapshot mode)
+                     (down-snapshot down))
+                    (if (f mode-snapshot)
+                        (new-stream-seed
+                         ((move (return move)))
+                         (g down-snapshot)))))))]
+        [spec-act-seed-one
+         (spec
+          '(mode down move)
+          'drawing
+          '(f g l n)
+          '()
+          '((mode
+             (split ((mode-snapshot mode)
+                     (down-snapshot down))
+                    (if (f mode-snapshot)
+                        (new-stream-seed
+                         ((move (return drawing)))
+                         (g down-snapshot)))))))]
+        [spec-no-act-seed-mul
+         (spec
+          '(mode down move)
+          'drawing
+          '(f g l n)
+          '()
+          '((mode
+             (split ((mode-snapshot mode)
+                     (down-snapshot down))
+                    (if (f mode-snapshot)
+                        (new-stream-seed
+                         ((move (if-else down-snapshot (return move) (return down-snapshot))))
+                         (g down-snapshot)))))))]
+        [spec-act-seed-mul
+         (spec
+          '(mode down move)
+          'drawing
+          '(f g l n)
+          '()
+          '((mode
+             (split ((mode-snapshot mode)
+                     (down-snapshot down))
+                    (if (f mode-snapshot)
+                        (new-stream-seed
                          ((move (if-else down-snapshot (return move) (return drawing))))
                          (g down-snapshot)))))))])
     (print-rx-program (compile spec-no-act-no-init-one))
@@ -174,6 +226,10 @@
     (print-rx-program (compile spec-act-init-one))
     (print-rx-program (compile spec-no-act-init-mul))
     (print-rx-program (compile spec-act-init-mul))
+    (print-rx-program (compile spec-no-act-seed-one))
+    (print-rx-program (compile spec-act-seed-one))
+    (print-rx-program (compile spec-no-act-seed-mul))
+    (print-rx-program (compile spec-act-seed-mul))
 
     ))
 

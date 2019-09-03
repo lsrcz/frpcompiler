@@ -22,8 +22,10 @@
 (define split-binding-name car)
 (define split-binding-body cadr)
 (define new-stream-body cadr)
-(define (new-stream-has-initial? s) (not (null? (cddr s))))
-(define new-stream-initial caddr)
+(define new-stream-initial-body cadr)
+(define new-stream-initial-initial caddr)
+(define new-stream-seed-body cadr)
+(define new-stream-seed-seed caddr)
 
 
 (define (build-begin seq) (cons 'begin seq))
@@ -36,7 +38,8 @@
 (define (build-custom name inst) (list 'custom name inst))
 (define (build-split bindings body) (list 'split bindings body))
 (define (build-new-stream body) (list 'new-stream body))
-(define (build-new-stream-initial body initial) (list 'new-stream body initial))
+(define (build-new-stream-initial body initial) (list 'new-stream-initial body initial))
+(define (build-new-stream-seed body seed) (list 'new-stream-seed body seed))
 (define (build-empty) (list 'empty-stream))
 
 
@@ -49,4 +52,6 @@
 (define (custom? body) (eq? (get-op body) 'custom))
 (define (split? body) (eq? (get-op body) 'split))
 (define (new-stream? body) (eq? (get-op body) 'new-stream))
+(define (new-stream-initial? body) (eq? (get-op body) 'new-stream-initial))
+(define (new-stream-seed? body) (eq? (get-op body) 'new-stream-seed))
 (define (empty-stream? body) (eq? (get-op body) 'empty-stream))
