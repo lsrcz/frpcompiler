@@ -1,7 +1,9 @@
-#lang racket
+#lang rosette/safe
 
 (require rackunit)
 (require "analyzed.rkt")
+(require rosette/lib/match)
+(require rosette/base/struct/struct)
 
 (provide (all-defined-out))
 

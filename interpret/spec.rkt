@@ -1,11 +1,13 @@
-#lang racket
+#lang rosette/safe
 
 (require "environment.rkt")
 (require "../test/test-spec.rkt")
 (require "analyzed.rkt")
 (require rackunit)
+(require rosette/lib/match)
+(require rosette/base/struct/struct)
 
-(struct run-result (event active) #:transparent)
+(provide interpret-spec)
 
 (define (analyze-if-imp js-expr branch)
   (let ([analyzed-js-expr (analyze-js-expr js-expr #t)]
@@ -122,8 +124,8 @@
     [(list 'new-stream-initial body initial)
      (analyze-new-stream-initial-inst body initial)]
     [(list 'new-stream-seed body seed)
-     (analyze-new-stream-seed-inst body seed)]
-    [_ (error "should not happen")]))
+     (analyze-new-stream-seed-inst body seed)]))
+    ;[_ (error "should not happen")]))
 
 (define (analyze-js-expr js-expr [only-constant #f])
   (match js-expr
@@ -543,4 +545,3 @@
                       (event 'd 14)
                       (event 'd 25)))
   )
-(main)
