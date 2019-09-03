@@ -101,7 +101,8 @@
             (let ([to-run (assoc name analyzed-body)])
               (if to-run
                   ((analyzed-value-call (cadr to-run)) env)
-                  env))])))
+                  env))]
+           [(empty-event) env])))
      (lambda (env)
        (foldl (lambda (func env) (func env)) env
               (map (lambda (x) (analyzed-value-unsub (cadr x))) analyzed-body))))))
