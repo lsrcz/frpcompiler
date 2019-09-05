@@ -42,17 +42,17 @@
   (spec
    '(mode down move)
    'drawing
-   '(f g l n)
-   '()
+   '(is_undefined is_curve_drawing l n)
+   '(empty_list)
    '((mode
       (split ((mode_snapshot mode)
               (down_snapshot down))
-             (if-else (f mode_snapshot)
+             (if-else (is_curve_drawing mode_snapshot)
                       (new-stream
-                       ((move (if-else (g drawing)
+                       ((move (if-else (is_undefined drawing)
                                        (return (l down_snapshot move))
                                        (return (n drawing (prev move) move))))))
-                      (empty-stream)))))))
+                      (new-stream-initial () empty_list)))))))
 
 
 
