@@ -9,6 +9,8 @@
 
 (provide interpret-spec)
 
+(define (die) (car '()))
+
 (define (analyze-if-imp js-expr branch)
   (let ([analyzed-js-expr (analyze-js-expr js-expr #t)]
         [analyzed-branch (analyze-inst-imp branch)])
@@ -55,7 +57,7 @@
             (let ([cur (car let-trans-list)]
                   [rest (cdr let-trans-list)])
               (let ([val ((binding-value cur) env)])
-              (if (not-found? val)
+              (if (too-early? val)
                   env
                   (iter rest (add-const-binding (binding-name cur) val env)))))))
       (analyzed-value
@@ -133,9 +135,10 @@
     [(list 'prev _)
      (lambda (env)
        (let ([result (resolve-environment env js-expr only-constant)])
-         (if (resolved? result)
-             (resolved-value result)
-             result)))]
+         (cond [(resolved? result)
+                (resolved-value result)]
+               [(not-found? result) (die)]
+               [(too-early? result) result])))]
     [(cons f lst)
      (let ([analyzed-f (analyze-js-expr f)]
            [analyzed-lst (map analyze-js-expr lst)])
@@ -144,14 +147,20 @@
                [analyzed-lst-val (map (lambda (x) (x env)) analyzed-lst)])
            (if (or (not-found? analyzed-f-val)
                    (not (null? (filter not-found? analyzed-lst-val))))
-               (not-found)
-               (apply analyzed-f-val analyzed-lst-val)))))]
+               (die)
+               (if (or (too-early? analyzed-f-val)
+                       (not (null? (filter too-early? analyzed-lst-val))))
+                   (too-early)
+                   (apply analyzed-f-val analyzed-lst-val))))))]
     [_
      (lambda (env)
        (let ([result (resolve-environment env js-expr only-constant)])
-         (if (resolved? result)
-             (resolved-value result)
-             result)))]))
+         (cond [(resolved? result)
+                (resolved-value result)]
+               [(not-found? result) (die)]
+               [(too-early? result) result])))]))
+
+
 
 (define (analyze-if js-expr branch)
   (let ([analyzed-js-expr (analyze-js-expr js-expr)]
@@ -159,7 +168,7 @@
     (analyzed-value
      (lambda (env)
        (let ([js-val (analyzed-js-expr env)])
-         (if (not-found? js-val)
+         (if (too-early? js-val)
              env
              (if js-val
                  ((analyzed-value-call analyzed-branch) env)
@@ -173,7 +182,7 @@
     (analyzed-value
      (lambda (env)
        (let ([js-val (analyzed-js-expr env)])
-         (if (not-found? js-val)
+         (if (too-early? js-val)
              env
              (if js-val
                  ((analyzed-value-call analyzed-then) env)
@@ -196,7 +205,7 @@
             (let ([cur (car let-trans-list)]
                   [rest (cdr let-trans-list)])
               (let ([val ((binding-value cur) env)])
-              (if (not-found? val)
+              (if (too-early? val)
                   env
                   (iter rest (add-stream-binding (binding-name cur) val env)))))))
       (analyzed-value
@@ -210,7 +219,7 @@
     (analyzed-value
      (lambda (env)
        (let ([value (analyzed-js-expr env)])
-         (if (not-found? value)
+         (if (too-early? value)
              env
              ((analyzed-value-call analyzed-next) (add-stream-binding name value env)))))
      (analyzed-value-unsub analyzed-next))))
@@ -220,7 +229,7 @@
     (analyzed-value
      (lambda (env)
        (let ([value (analyzed-js-expr env)])
-         (if (not-found? value)
+         (if (too-early? value)
              env
              (set-ret-value value env))))
      (lambda (env) env))))
@@ -233,7 +242,7 @@
         [(list) ((analyzed-value-call analyzed-body) env)]
         [(list-rest (list name analyzed-js-expr) rest)
          (let ([value (analyzed-js-expr env)])
-           (if (not-found? value)
+           (if (too-early? value)
                env
                (iter rest (add-const-binding name (analyzed-js-expr env) env))))]))
     (analyzed-value

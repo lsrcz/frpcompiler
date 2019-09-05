@@ -17,6 +17,7 @@
 (struct environment (glb-env loc-env) #:transparent)
 (struct resolved (value) #:transparent)
 (struct not-found () #:transparent)
+(struct too-early () #:transparent)
 
 
 (struct event (name value) #:transparent)
@@ -28,7 +29,7 @@
 (define (get-value trace time name prev-num)
   (define (iter num remaining)
     (match remaining
-      [(list) (not-found)]
+      [(list) (too-early)]
       [(cons cur rest)
        (let ([name-eq (and (not (empty-event? cur)) (eq? (event-name cur) name))]
              [num-zero (= num 0)])
