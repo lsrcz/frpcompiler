@@ -110,6 +110,9 @@
                                     (get-ident (+ ident 2))
                                     (get-ident (+ ident 2))
                                     (get-ident ident))]))
+    (define (format-of o)
+      (match o
+        [(rx-of val) (format "of(~a)" (format-symbol val))]))
     (define (format-ref r)
       (ref->str r))
     (define (format-pair-ref r)
@@ -125,6 +128,7 @@
             [(rx-custom? s) (format-custom ident s)]
             [(rx-empty? s) "NEVER"]
             [(rx-action? s) (format-action ident s)]
+            [(rx-of? s) (format-of s)]
             [else (error "not implemented")]))
     (define (format-pipe ident pipe)
       (match pipe

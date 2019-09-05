@@ -25,10 +25,14 @@
       [(list 'if-else arg then-branch else-branch)
        (build-if-else arg (translate-imperative constantlist then-branch) (translate-imperative constantlist else-branch))]
       [(list 'empty-stream) (ir-list inputs-map (list (empty-inst)) constantlist)]
+      [(list 'new-stream (list)) (ir-list inputs-map (list (empty-inst)) constantlist)]
       [(list 'new-stream body)
        (translate-new-stream constantlist body)]
+      [(list 'new-stream-initial (list) start-val)
+       (ir-list inputs-map (list (of-inst start-val)) constantlist)]
       [(list 'new-stream-initial body start-val)
        (translate-new-stream constantlist body start-val #t)]
+      [(list 'new-stream-seed (list) _) (ir-list inputs-map (list (empty-inst)) constantlist)]
       [(list 'new-stream-seed body start-val)
        (translate-new-stream constantlist body start-val #f)]
       [_ (error "error pattern")]))
@@ -312,7 +316,8 @@
              (append (analyze-prev-imperative then-branch) (analyze-prev-imperative else-branch))]
             [(list 'empty-stream) '()]
             [(list 'new-stream new-stream) (analyze-prev-new-stream new-stream)]
-            [(list 'new-stream new-stream _) (analyze-prev-new-stream new-stream)]))
+            [(list 'new-stream-initial new-stream _) (analyze-prev-new-stream new-stream)]
+            [(list 'new-stream-seed new-stream _) (analyze-prev-new-stream new-stream)]))
         (cond [(if? inst)
                (analyze-prev-if inst)]
               [(if-else? inst)

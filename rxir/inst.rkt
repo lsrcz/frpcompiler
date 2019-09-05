@@ -12,6 +12,7 @@
 (struct rx-custom (stream name) #:transparent)
 (struct rx-empty () #:transparent)
 (struct rx-action (action-source) #:transparent)
+(struct rx-of (val) #:transparent)
 
 (struct rx-start-with-undefined () #:transparent)
 (struct rx-buffer-count (buffer-size start-buffer-every) #:transparent)

@@ -174,6 +174,10 @@
                           (list (rx-map-shape (get-shape ref) binding-ori))
                           (list))
                       (list switch-map-inst (rx-to-action output)))))]))
+      (define (emit-of ir)
+        (match ir
+          [(of-inst val)
+           (rx-of val)]))
       (define (emit-empty ir)
         (rx-empty))
       (define (emit-imperative inst)
@@ -204,6 +208,7 @@
              [(merge-action-start-inst? ir) emit-merge-action-start]
              [(scan-start-inst? ir) emit-scan-start]
              [(start-with-inst? ir) emit-start-with]
+             [(of-inst? ir) emit-of]
              [else (error ir)])
        ir))
     (define (iter ir-list-input rxir-mapping)

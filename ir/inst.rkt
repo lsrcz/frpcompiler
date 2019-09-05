@@ -21,6 +21,7 @@
 (struct scan-inst (return-val action ref) #:transparent)
 (struct scan-start-inst (return-val action start-val ref) #:transparent)
 (struct start-with-inst (val ref) #:transparent)
+(struct of-inst (val) #:transparent)
 
 
 (struct ir-list (input-lst lst ref-table-lst) #:transparent)

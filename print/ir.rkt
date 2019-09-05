@@ -97,6 +97,7 @@
         [(scan-start-inst return-val action start-val ref) (format "~a = ~a.scan(~a => ~a, ~a)" (inst->str inst) (inst->str ref) return-val action start-val)]
         [(start-with-inst val ref) (format "~a = ~a.startwith(~a)" (inst->str inst) (inst->str ref) val)]
         [(empty-inst) (format "~a = NEVER" (inst->str inst))]
+        [(of-inst val) (format "~a = of(~a)" (inst->str inst) val)]
         [(split-inst bindings imperative ref)
          (string-append
           (format "~a = ~a.split(~a => {\n" (inst->str inst) (inst->str ref) bindings)
