@@ -1,4 +1,4 @@
-#lang racket
+#lang rosette/safe
 
 (provide (all-defined-out))
 
