@@ -1,7 +1,7 @@
 #lang rosette/safe
 
 (require "environment.rkt")
-(require "../test/test-spec.rkt")
+(require "../../test/test-spec.rkt")
 (require "analyzed.rkt")
 (require rackunit)
 (require rosette/lib/match)

@@ -1,7 +1,7 @@
 #lang rosette/safe
 
 (require rosette/lib/match
-         "../interpret/spec.rkt"
+         "../interpret/interpret-spec/spec.rkt"
          rosette/base/struct/struct)
 
 (provide (all-defined-out))

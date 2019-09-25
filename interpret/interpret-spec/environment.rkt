@@ -154,7 +154,6 @@
                                             (remove-sub (global-env-active-sub glb-env))])))))
       ;env))
 
-
 (define (main-env)
   (define tr
     (trace

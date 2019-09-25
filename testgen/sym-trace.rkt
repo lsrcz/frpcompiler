@@ -1,6 +1,6 @@
 #lang rosette
 
-(require "../interpret/environment.rkt"
+(require "../interpret/interpret-spec/environment.rkt"
          rosette/lib/match
          rosette/lib/angelic)
 

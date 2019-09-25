@@ -1,9 +1,9 @@
 #lang rosette/safe
 
 (require "sym-trace.rkt"
-         "../interpret/analyzed.rkt"
-         "../interpret/environment.rkt"
-         "../interpret/spec.rkt"
+         "../interpret/interpret-spec/analyzed.rkt"
+         "../interpret/interpret-spec/environment.rkt"
+         "../interpret/interpret-spec/spec.rkt"
          "../test/test-spec.rkt"
          "test-suite.rkt"
          "mut-gen.rkt"
@@ -61,21 +61,21 @@
              (format-specs not-well-formed))]))
 
 (define (find-distinguish-input spec1 spec2 bindings sym-trace)
-  (define e (engine (lambda (_)
+  #|(define e (engine (lambda (_)|#
                       (synthesize
                        #:forall (list)
                        #:guarantee
                        (assert (not
                                 (equal? (interpret-spec spec1 sym-trace bindings)
-                                        (interpret-spec spec2 sym-trace bindings))))))))
+                                        (interpret-spec spec2 sym-trace bindings))))))#|))
   (if (engine-run 100000 e)
       (engine-result e)
-      'timeout))
+      'timeout))|#
 
 (define (check-semantics spec-input sym-trace binding-input)
-  (define e
+  #|(define e
     (engine
-     (lambda (_)
+     (lambda (_)|#
        (displayln "Checking")
        (displayln spec-input)
        (let ([val (sat? (time
@@ -83,10 +83,10 @@
                           #:guarantee (assert (interpret-spec spec-input sym-trace binding-input)))))])
 
          (displayln val)
-         val))))
+         val))#|))
   (if (engine-run 20000 e)
       (engine-result e)
-      #f))
+      #f))|#
 
 (define (gen-test-on-mutants spec mutants bindings constructor-list start-len max-len step)
   (define (gen-test-on-mutant mutant cur-len)

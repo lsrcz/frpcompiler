@@ -1,9 +1,9 @@
 #lang rosette/safe
 
 (require "sym-trace.rkt"
-         "../interpret/analyzed.rkt"
-         "../interpret/environment.rkt"
-         "../interpret/spec.rkt"
+         "../interpret/interpret-spec/analyzed.rkt"
+         "../interpret/interpret-spec/environment.rkt"
+         "../interpret/interpret-spec/spec.rkt"
          "../test/test-spec.rkt")
 
 (define (find-input spec binding sym-trace output)
@@ -126,9 +126,9 @@
         (event 'c 2)
         (event 'b 1)
         (event 'c 3)
-        #|(event 'a 0)
+        (event 'a 0)
         (event 'c 1)
-        (event 'b 0)
+        #|(event 'b 0)
         (event 'c 2)
         (event 'b 1)
         (event 'c 3)
@@ -150,7 +150,6 @@
 
     (define m (find-input spec-input binding-input sym-trace (interpret-spec spec-input concrete-trace binding-input)))
     (displayln (evaluate sym-trace m)))
-  ;(test-case6)
 
   (define (test-case7)
     (define spec-input (spec '(a b) 'd '(add1 + - not >) '(t x)
