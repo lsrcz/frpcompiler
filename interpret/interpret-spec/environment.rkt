@@ -11,8 +11,10 @@
 
 (struct binding (name value) #:transparent)
 (struct sub (bindings body) #:transparent)
+(struct call-def (name call index) #:transparent)
 
-(struct global-env (trace time inputs output last-value return-val active-sub) #:transparent)
+(struct global-env (trace time inputs output last-value return-val
+                    sub-list sub-bv sym-bv-mapping sub-binding) #:transparent)
 (struct local-env (stream-bindings const-bindings) #:transparent)
 (struct environment (glb-env loc-env) #:transparent)
 (struct resolved (value) #:transparent)
@@ -48,13 +50,20 @@
         [(list 'prev sym1) (iter sym1 (+ 1 num))]
         [_ (get-value trace time sym num)]))
     (iter sym 0))
-  (define (resolve-list lst sym)
+  #;(define (resolve-list lst sym)
     (let ([filtered (filter (match-lambda [(binding name value) (eq? name sym)]) lst)])
       (if (null? filtered)
           (not-found)
           (resolved (binding-value (car filtered))))))
+  (define (resolve-list lst sym)
+    (match lst
+      [(list) (not-found)]
+      [(cons (binding name value) rest)
+       (if (eq? name sym)
+           (resolved value)
+           (resolve-list rest sym))]))
   (match env
-    [(environment (global-env trace time inputs output last-value _ _)
+    [(environment (global-env trace time inputs output last-value _ _ _ _ _)
                   (local-env stream-bindings const-bindings))
      (if only-constant
          (resolve-list (append const-bindings) sym)
@@ -69,7 +78,7 @@
 
 (define (get-event env)
   (match env
-    [(environment (global-env trace time _ _ _ _ _) _)
+    [(environment (global-env trace time _ _ _ _ _ _ _ _) _)
      (get-event-by-time trace time)]))
 
 (define (update-loc-env env new-loc-env)
@@ -119,40 +128,68 @@
    (let ([glb-env (environment-glb-env env)])
      (struct-copy global-env glb-env [return-val 'undefined]))))
 
-(define (is-subscribed? stream-body glb-env)
-  (if (memq stream-body (map sub-body (global-env-active-sub glb-env)))
-      #t
-      #f))
+(define (sub-bv-mask value env)
+  (update-glb-env
+   env
+   (let ([glb-env (environment-glb-env env)])
+     (struct-copy global-env glb-env
+                  [sub-bv (bvand value (global-env-sub-bv glb-env))]))))
 
-(define (subscribe stream-body env)
+(define (sub-bv-set value env)
+  (update-glb-env
+   env
+   (let ([glb-env (environment-glb-env env)])
+     (struct-copy global-env glb-env
+                  [sub-bv (bvor value (global-env-sub-bv glb-env))]))))
+
+(define (list-update v idx lst)
+  (if (= idx 0)
+      (cons v (cdr lst))
+      (cons (car lst) (list-update v (- idx 1) (cdr lst)))))
+
+(define (update-sub-binding index env)
   (update-glb-env
    env
    (let ([glb-env (environment-glb-env env)]
          [loc-env (environment-loc-env env)])
-     (if (is-subscribed? stream-body glb-env)
-         glb-env
-         (struct-copy global-env glb-env [active-sub
-                                          (cons (sub (local-env-const-bindings loc-env) stream-body)
-                                                (global-env-active-sub glb-env))])))))
+     (struct-copy global-env glb-env
+                  [sub-binding
+                   (list-update (local-env-const-bindings loc-env) index
+                                (global-env-sub-binding glb-env))
+                   ]))))
 
-(define (unsubscribe stream-body env)
-  (define (remove-sub active-sub)
-    (match active-sub
-      [(list) '()]
+(define (is-subscribed? name glb-env)
+  (match glb-env
+    [(global-env _ _ _ _ _ _ sub-list sub-bv sym-bv-mapping sub-binding)
+     (let ([assoc-val (assoc name sym-bv-mapping)])
+       (if assoc-val
+           (not (bveq (bv 0 (length sub-binding)) (bvand sub-bv (cdr assoc-val))))
+           #f))]
+    ))
+
+(define (advance-glb-env glb-env)
+  (define (get-sub name sub-list)
+    (match sub-list
+      [(list) 'no]
       [(cons cur rest)
        (match cur
-         [(sub _ body)
-          (if (eq? body stream-body)
-              rest
-              (cons cur (remove-sub rest)))])]))
-  ;(if (is-subscribed? stream-body (environment-glb-env env))
-      (let ([unsubed-env ((analyzed-value-unsub stream-body) env)])
-        (update-glb-env
-         unsubed-env
-         (let ([glb-env (environment-glb-env unsubed-env)])
-           (struct-copy global-env glb-env [active-sub
-                                            (remove-sub (global-env-active-sub glb-env))])))))
-      ;env))
+         [(call-def namec _ _)
+          (if (eq? namec name)
+              cur
+              (get-sub name rest))])]))
+  (match glb-env
+    [(global-env trace time _ _ _ _ sub-list _ _ sub-binding)
+     (let ([evt (get-event-by-time trace time)])
+       (advance-time-glb
+        (if (or (empty-event? evt)
+                (not (is-subscribed? (event-name evt) glb-env)))
+            glb-env
+            (let ([sub (get-sub (event-name evt) sub-list)])
+              (match sub
+                [(call-def _ call idx)
+                 (let ([env (environment glb-env (local-env '() (list-ref sub-binding idx)))])
+                   (environment-glb-env (call env)))])))))]))
+              
 
 (define (main-env)
   (define tr
@@ -209,7 +246,10 @@
      'x
      -100
      0
-     '())
+     '()
+     (bv 1 2)
+     '()
+     )
   )
   (define loc-env
     (local-env
