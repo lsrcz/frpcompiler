@@ -128,7 +128,7 @@
         (event 'c 3)
         (event 'a 0)
         (event 'c 1)
-        #|(event 'b 0)
+        (event 'b 0)
         (event 'c 2)
         (event 'b 1)
         (event 'c 3)
@@ -139,7 +139,7 @@
         (event 'b 1)
         (event 'c 3)
         (event 'a 0)
-        (event 'c 3)|#
+        (event 'c 3)
 
         )))
     (define sym-trace (get-symbolic-trace
@@ -211,7 +211,7 @@
 
     (define m (find-input spec-input binding-input sym-trace (interpret-spec spec-input concrete-trace binding-input)))
     (displayln (evaluate sym-trace m)))
-  (test-case7)
+  (test-case6)
 
 
   )

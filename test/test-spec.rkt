@@ -1,14 +1,15 @@
-#lang racket
+#lang rosette/safe
 
 (provide (all-defined-out))
 
-(struct spec (inputs output funclist constantlist body) #:transparent)
+(struct spec (inputs output funclist constantlist defaultval body) #:transparent)
 
 (define drawing-spec
   (spec
    '(mode move down)
    'drawing
    '(f h g m l n)
+   '()
    '()
    (list
     '(mode
@@ -27,6 +28,7 @@
    'drawing
    '(f h g m l n)
    '()
+   '()
    (list
     '(mode
       (if-else (f mode)
@@ -44,14 +46,16 @@
    'drawing
    '(is_undefined is_curve_drawing l n)
    '(empty_list)
+   '()
    '((mode
       (split ((mode_snapshot mode)
               (down_snapshot down))
              (if-else (is_curve_drawing mode_snapshot)
                       (new-stream
-                       ((move (if-else (is_undefined drawing)
-                                       (return (l down_snapshot move))
-                                       (return (n drawing (prev move) move))))))
+                       ((move
+                         (if-else (is_undefined drawing)
+                                  (return (l down_snapshot move))
+                                  (return (n drawing (prev move) move))))))
                       (new-stream-initial () empty_list)))))))
 
 
@@ -61,6 +65,7 @@
    '(mode move down)
    'drawing
    '(f h g m l n)
+   '()
    '()
    (list
     '(mode

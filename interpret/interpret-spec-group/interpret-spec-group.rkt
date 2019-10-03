@@ -415,9 +415,6 @@
                    (map (lambda (name) (collected-with-empty-list name '())) stream-list)
                    (build-initial-sub-environment spec-result-list)))
      (define (run-trace event-lst glb-env)
-       (displayln "glb-env")
-       (displayln glb-env)
-       (displayln event-lst)
        (if (too-early? glb-env)
            glb-env
            (match event-lst
@@ -452,6 +449,57 @@
                                                          (new-stream ((s6 (split ((sx6 s6)) (new-stream ((s7 (return s7))))))
                                                                       (sx (split ((sxx sx)) (new-stream ((s8 (return s8)))))))))))))))))))
 
+  (define (check-glb-env glb-env collected-with-empty)
+    (check-equal? (length collected-with-empty) (length (global-env-inputs glb-env)))
+    (define symbols (global-env-inputs glb-env))
+    (define (iter-symbols-check symbols symbols-input)
+      (match symbols
+        [(list) (void)]
+        [(cons cur rest)
+         (begin
+           (check-true (memq cur symbols-input))
+           (iter-symbols-check rest symbols-input))]))
+    (iter-symbols-check symbols (map collected-with-empty-list-name collected-with-empty))
+    (define (iter-collected-with-empty-check symbols glb-input input)
+      (match symbols
+        [(list) (void)]
+        [(cons cur rest)
+         (let* ([find-proc (lambda (x) (eq? cur (collected-with-empty-list-name x)))]
+                [glb-val (findf find-proc glb-input)]
+                [input-val (findf find-proc glb-input)])
+           (check-not-false glb-val)
+           (check-not-false input-val)
+           (check-equal? glb-val input-val)
+           (iter-collected-with-empty-check rest glb-input input))]))
+    (iter-collected-with-empty-check symbols (global-env-collected-with-empty glb-env) collected-with-empty)
+
+    
+    (define (remove-empty input)
+      (match input
+        [(collected-with-empty-list name list)
+         (collected-list name (map event-value (filter event? list)))]))
+    
+    (define collected (map remove-empty collected-with-empty))
+    (define (iter-collected-check symbols glb-input input)
+      (match symbols
+        [(list) (void)]
+        [(cons cur rest)
+         (let* ([find-proc (lambda (x) (eq? cur (collected-list-name x)))]
+                [glb-val (findf find-proc glb-input)]
+                [input-val (findf find-proc glb-input)])
+           (check-not-false glb-val)
+           (check-not-false input-val)
+           (check-equal? glb-val input-val)
+           (iter-collected-check rest glb-input input))]))
+    (iter-collected-check symbols (global-env-collected glb-env) collected))
+    
+
+  (define (extract-one-symbol-trace symbol trace-input)
+    (match trace-input
+      [(trace lst)
+       (collected-with-empty-list
+        symbol
+        (filter (lambda (x) (and (event x) (eq? (event-name x) symbol))) lst))]))
   
   (define tr1
     (trace
@@ -465,7 +513,19 @@
       (event 'a 4)
       (event 'a 5))))
   (define binding1 (list (binding 'f add1) (binding 'g -) (binding 'not not)))
-  (interpret-spec-group (spec-group '() (list spec1)) tr1 binding1)
+  (check-glb-env
+   (interpret-spec-group (spec-group '() (list spec1)) tr1 binding1)
+   (append
+    (map (lambda (x) (extract-one-symbol-trace x tr1)) '(a d))
+    (list (collected-with-empty-list 'b
+                                     (list (event 'b 6)
+                                           (event 'b 5)
+                                           (empty-event)
+                                           (empty-event)
+                                           (empty-event)
+                                           (event 'b 3)
+                                           (event 'b 2)
+                                           (empty-event))))))
   #|(check-equal? (interpret-spec spec1 tr1 binding1)
                 (list
                  (empty-event)

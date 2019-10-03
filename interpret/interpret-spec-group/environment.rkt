@@ -55,8 +55,6 @@
   (find-name collected))
 
 (define (resolve-environment env sym target [only-constant #f])
-  (displayln sym)
-  (displayln only-constant)
   (define (resolve-input sym collected)
     (define (iter sym num)
       (match sym
@@ -151,7 +149,6 @@
                                  sub-env-list)))]))
 
 (define (run-on-env from value glb-env)
-  (displayln glb-env)
   (define (is-subscribed? name sub-env)
     (match sub-env
       [(sub-environment sub-list sub-bv sym-bv-mapping sub-binding)

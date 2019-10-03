@@ -1,6 +1,6 @@
 #lang rosette/safe
 
-(require rackunit)
+;(require rackunit)
 (require "analyzed.rkt")
 (require rosette/lib/match)
 (require rosette/base/struct/struct)
@@ -31,7 +31,8 @@
 (define (get-value trace time name prev-num)
   (define (iter num remaining)
     (match remaining
-      [(list) (too-early)]
+      [(list)
+       (too-early)]
       [(cons cur rest)
        (let ([name-eq (and (not (empty-event? cur)) (eq? (event-name cur) name))]
              [num-zero (= num 0)])
@@ -43,12 +44,19 @@
   (let* ([remaining (reverse (take (trace-event-lst trace) (+ 1 time)))])
     (iter prev-num remaining)))
 
-(define (resolve-environment env sym [only-constant #f])
+(define (resolve-environment env sym defaultval [only-constant #f])
   (define (resolve-input trace sym time)
     (define (iter sym num)
       (match sym
         [(list 'prev sym1) (iter sym1 (+ 1 num))]
-        [_ (get-value trace time sym num)]))
+        [_
+         (let ([val (get-value trace time sym num)])
+           (if (too-early? val)
+               (let ([default (assoc sym defaultval)])
+                 (if default
+                     (resolve-environment env (cadr default) defaultval #t)
+                     (too-early)))
+               val))]))
     (iter sym 0))
   #;(define (resolve-list lst sym)
     (let ([filtered (filter (match-lambda [(binding name value) (eq? name sym)]) lst)])
@@ -190,7 +198,7 @@
                  (let ([env (environment glb-env (local-env '() (list-ref sub-binding idx)))])
                    (environment-glb-env (call env)))])))))]))
               
-
+#|
 (define (main-env)
   (define tr
     (trace
@@ -266,4 +274,4 @@
   (check-equal? (resolve-environment (advance-time (advance-time env)) 'c) (resolved -1))
   (check-equal? (resolve-environment (advance-time (advance-time env)) 'd) (resolved -11))
   (check-equal? (resolve-environment (advance-time (advance-time env)) 'x) (resolved -100))
-  )
+  )|#
