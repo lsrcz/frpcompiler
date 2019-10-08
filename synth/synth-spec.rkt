@@ -39,9 +39,9 @@
 (define off 'off)
 
 (define (f1 b)
-  1)
+  0)
 (define (f2 b)
-  1)
+  0)
 #|
 (define (f1 b1 b2 b3 b4)
   (cond [b1 0]
@@ -149,8 +149,9 @@
                           #:guarantee (assert (equal? trace-input sym-trace))))
 (evaluate sym-trace model)
 (displayln "BUGGY???????")
-(evaluate (interpret-spec sprinkler-spec sym-trace bindings) model)
+
 (interpret-spec sprinkler-spec (evaluate sym-trace model) bindings)
+(evaluate (interpret-spec sprinkler-spec sym-trace bindings) model)
 (car '())
 
 (define m1 (time (synthesize #:forall '()
