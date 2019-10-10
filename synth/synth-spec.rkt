@@ -216,10 +216,27 @@
 (verify (eq? (interpret-spec sprinkler-spec sym-trace (evaluate symbolic-bindings synth-m))
              (interpret-spec sprinkler-spec sym-trace bindings)))
 
+(define poster-trace
+  (trace
+   (list
+    (event 'clock six)
+    (event 'motion not-detected)
+    (empty-event)
+    (event 'motion detected)
+    (empty-event)
+    (event 'motion not-detected)
+    (event 'clock sixten)
+    (event 'motion not-detected))))
 
+(define synth-m1 (synthesize-spec sprinkler-spec symbolic-bindings sym-trace poster-trace
+                                  (interpret-spec sprinkler-spec poster-trace bindings)
+                                 (annotate-groundtruth sprinkler-spec bindings)))
 
+(verify (eq? (interpret-spec sprinkler-spec sym-trace (evaluate symbolic-bindings synth-m))
+             (interpret-spec sprinkler-spec sym-trace bindings)))
 
-                                         
+(define-symbolic f (~> integer? integer?))
+
 
 
                          
