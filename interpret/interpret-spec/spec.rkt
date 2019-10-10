@@ -4,9 +4,9 @@
 (require "../../test/test-spec.rkt")
 (require "analyzed.rkt")
 (require "../subscribe-fsm.rkt")
-;(require rackunit)
+(require "../../ast/syntax.rkt")
+(require rackunit)
 (require rosette/lib/match)
-(require rosette/base/struct/struct)
 
 (provide interpret-spec analyze)
 
@@ -61,9 +61,11 @@
     (let* ([let-list (reverse (cdr (reverse lst)))]
            [next (last lst)])
       (let ([let-trans-list
-             (map (match-lambda
-                    [(list 'let name js-expr)
-                     (let ([analyzed-js-expr (analyze-js-expr js-expr #t)]) (binding name analyzed-js-expr))])
+             (map (lambda (x)
+                    (let* ([name (cadr x)]
+                           [js-expr (caddr x)]
+                           [analyzed-js-expr (analyze-js-expr js-expr #t)])
+                      (binding name analyzed-js-expr)))
                   let-list)]
             [analyzed-next (analyze-inst-imp next index indexne)])
         (match analyzed-next
@@ -154,73 +156,115 @@
 
   (define (analyze-new-stream body index indexne)
     (define (iter body index indexne)
-      (match body
-        [(list) '()]
-        [(cons (list name inst) rest)
-         (let ([analyzed-inst (analyze-inst inst index indexne)])
-           (cons (list name analyzed-inst)
-                 (iter rest (+ index (analyzed-value-processed-num analyzed-inst))
-                       (+ indexne (analyzed-value-processed-num-non-empty analyzed-inst)))))]))
+      (if (null? body)
+          '()
+          (let* ([cur (car body)]
+                 [rest (cdr body)]
+                 [name (car cur)]
+                 [inst (cadr cur)])
+            (let ([analyzed-inst (analyze-inst inst index indexne)])
+              (cons (list name analyzed-inst)
+                    (iter rest (+ index (analyzed-value-processed-num analyzed-inst))
+                          (+ indexne (analyzed-value-processed-num-non-empty analyzed-inst))))))))
     
     (let ([analyzed-body (iter body index indexne)])
       (analyzed-new-stream
-       (append (map (match-lambda [(list name (analyzed-value call _ _ _)) (call-def name call (- indexne 1))]) analyzed-body)
-               (append-map (match-lambda [(list _ (analyzed-value _ sons _ _)) sons]) analyzed-body))
-       (apply + (map (match-lambda [(list _ (analyzed-value _ _ num _)) num]) analyzed-body))
-       (apply + (map (match-lambda [(list _ (analyzed-value _ _ _ numne)) numne]) analyzed-body))
+       (append (map
+                (lambda (x)
+                  (let* ([name (car x)]
+                         [analyzed (cadr x)]
+                         [call (analyzed-value-call analyzed)])
+                    (call-def name call (- indexne 1))))
+                analyzed-body)
+               (append-map
+                (lambda (x)
+                  (let* ([analyzed (cadr x)]
+                         [sons (analyzed-value-sons analyzed)])
+                    sons))
+                analyzed-body))
+       (apply + (map
+                 (lambda (x)
+                   (let* ([analyzed (cadr x)]
+                          [num (analyzed-value-processed-num analyzed)])
+                     num))
+                 analyzed-body))
+       (apply + (map
+                 (lambda (x)
+                   (let* ([analyzed (cadr x)]
+                          [numne (analyzed-value-processed-num-non-empty analyzed)])
+                     numne))
+                 analyzed-body))
        )))
 
   (define (analyze-inst-imp inst index indexne)
-    (match inst
-      [(list 'if js-expr branch)
-       (analyze-if-imp js-expr branch index indexne)]
-      [(list 'if-else js-expr then-branch else-branch)
-       (analyze-if-else-imp js-expr then-branch else-branch index indexne)]
-      [(list 'bind name js-expr next)
-       (analyze-bind-imp name js-expr next index indexne)]
-      [(cons 'begin lst)
-       (analyze-begin-imp lst index indexne)]
-      [(list 'empty-stream)
-       (analyze-empty-stream-inst index indexne)]
-      [(list 'new-stream body)
-       (analyze-new-stream-inst body index indexne)]
-      [(list 'new-stream-initial body initial)
-       (analyze-new-stream-initial-inst body initial index indexne)]
-      [(list 'new-stream-seed body seed)
-       (analyze-new-stream-seed-inst body seed index indexne)]))
-  ;[_ (error "should not happen")]))
+    (cond [(if? inst)
+           (analyze-if-imp (if-arg inst)
+                           (if-branch inst)
+                           index
+                           indexne)]
+          [(if-else? inst)
+           (analyze-if-else-imp (if-else-arg inst)
+                           (if-else-then-branch inst)
+                           (if-else-else-branch inst)
+                           index
+                           indexne)]
+          [(bind? inst)
+           (analyze-bind-imp (bind-name inst)
+                             (bind-body inst)
+                             (bind-inst inst)
+                             index
+                             indexne)]
+          [(begin? inst)
+           (analyze-begin-imp (begin-seq inst)
+                              index
+                              indexne)]
+          [(empty-stream? inst)
+           (analyze-empty-stream-inst index indexne)]
+          [(new-stream? inst)
+           (analyze-new-stream-inst (new-stream-body inst)
+                                    index
+                                    indexne)]
+          [(new-stream-initial? inst)
+           (analyze-new-stream-initial-inst (new-stream-initial-body inst)
+                                            (new-stream-initial-initial inst)
+                                            index
+                                            indexne)]
+          [(new-stream-seed? inst)
+           (analyze-new-stream-seed-inst (new-stream-seed-body inst)
+                                         (new-stream-seed-seed inst)
+                                         index
+                                         indexne)]
+          [else (die)]))
 
   (define (analyze-js-expr js-expr [only-constant #f])
-    (match js-expr
-      [(list 'prev _)
-       (lambda (env)
-         (let ([result (resolve-environment env js-expr defaultval only-constant)])
-           (cond [(resolved? result)
-                  (resolved-value result)]
-                 [(not-found? result) (die)]
-                 [(too-early? result) result])))]
-      [(cons f lst)
-       (let ([analyzed-f (analyze-js-expr f)]
-             [analyzed-lst (map analyze-js-expr lst)])
-         (lambda (env)
-           (let ([analyzed-f-val (analyzed-f env)]
-                 [analyzed-lst-val (map (lambda (x) (x env)) analyzed-lst)])
-             (if (or (not-found? analyzed-f-val)
-                     (not (null? (filter not-found? analyzed-lst-val))))
-                 (die)
-                 (if (or (too-early? analyzed-f-val)
-                         (not (null? (filter too-early? analyzed-lst-val))))
-                     (too-early)
-                     (apply analyzed-f-val analyzed-lst-val))))))]
-      [_
-       (lambda (env)
-         (let ([result (resolve-environment env js-expr defaultval only-constant)])
-           (cond [(resolved? result)
-                  (resolved-value result)]
-                 [(not-found? result) (die)]
-                 [(too-early? result) result])))]))
-
-
+    (if (pair? js-expr)
+        (if (eq? 'prev (car js-expr))
+            (lambda (env)
+              (let ([result (resolve-environment env js-expr defaultval only-constant)])
+                (cond [(resolved? result)
+                       (resolved-value result)]
+                      [(not-found? result) (die)]
+                      [(too-early? result) result])))
+            (let ([f (car js-expr)]
+                  [lst (cdr js-expr)])
+              (let ([analyzed-f (analyze-js-expr f)]
+                    [analyzed-lst (map analyze-js-expr lst)])
+                (lambda (env)
+                  (let ([analyzed-f-val (analyzed-f env)]
+                        [analyzed-lst-val (map (lambda (x) (x env)) analyzed-lst)])
+                    (if (or (not-found? analyzed-f-val)
+                            (not (null? (filter not-found? analyzed-lst-val))))
+                        (die)
+                        (if (or (too-early? analyzed-f-val)
+                                (not (null? (filter too-early? analyzed-lst-val))))
+                            (too-early)
+                            (apply analyzed-f-val analyzed-lst-val))))))))
+        (lambda (env)
+          (let ([result (resolve-environment env js-expr defaultval only-constant)])
+            (cond [(resolved? result)
+                   (resolved-value result)]
+                  [(not-found? result) (die)]
+                  [(too-early? result) result])))))
 
   (define (analyze-if js-expr branch index indexne)
     (let ([analyzed-js-expr (analyze-js-expr js-expr)]
@@ -260,10 +304,13 @@
                (+ then-numne else-numne))]))])))
 
   (define (iter-not-too-early? js-vals)
-    (match js-vals
-      [(list) #t]
-      [(cons (too-early) _) #f]
-      [(cons _ rest) (iter-not-too-early? rest)]))
+    (if (null? js-vals)
+        #t
+        (let ([cur (car js-vals)]
+              [rest (cdr js-vals)])
+          (if (too-early? cur)
+              #f
+              (iter-not-too-early? rest)))))
   
   (define (analyze-if-multi args branch mapping index indexne)
     (let ([analyzed-args (map analyze-js-expr args)]
@@ -307,13 +354,14 @@
 
   (define (analyze-case-multi args branchs mapping index indexne)
     (define (iter-analyze-branchs branchs index indexne)
-      (match branchs
-        [(list) '()]
-        [(cons cur rest)
-         (let ([analyzed-cur (analyze-inst cur index indexne)])
-           (match analyzed-cur
-             [(analyzed-value _ _ num numne)
-              (cons analyzed-cur (iter-analyze-branchs rest (+ num index) (+ indexne numne)))]))]))
+      (if (null? branchs)
+          '()
+          (let ([cur (car branchs)]
+                [rest (cdr branchs)])
+            (let ([analyzed-cur (analyze-inst cur index indexne)])
+              (match analyzed-cur
+                [(analyzed-value _ _ num numne)
+                 (cons analyzed-cur (iter-analyze-branchs rest (+ num index) (+ indexne numne)))])))))
     (let* ([analyzed-args (map analyze-js-expr args)]
            [analyzed-mapping (analyze-js-expr mapping)]
            [analyzed-branchs (iter-analyze-branchs branchs index indexne)]
@@ -323,7 +371,9 @@
          (let ([js-vals (map (lambda (x) (x env)) analyzed-args)])
            (if (and (not (too-early? analyzed-mapping)) (iter-not-too-early? js-vals))
                (let ([idx (apply (analyzed-mapping env) js-vals)])
-                 ((list-ref calls idx) env))
+                 (if (or (< idx 0) (>= idx (length branchs)))
+                     (die)
+                     ((list-ref calls idx) env)))
                env)))
        (append* (map analyzed-value-sons analyzed-branchs))
        (apply + (map analyzed-value-processed-num analyzed-branchs))
@@ -333,9 +383,12 @@
     (let* ([let-list (reverse (cdr (reverse lst)))]
            [next (last lst)])
       (let ([let-trans-list
-             (map (match-lambda
-                    [(list 'let name js-expr)
-                     (let ([analyzed-js-expr (analyze-js-expr js-expr)]) (binding name analyzed-js-expr))])
+             (map
+              (lambda (x)
+                (let* ([name (cadr x)]
+                       [js-expr (caddr x)]
+                       [analyzed-js-expr (analyze-js-expr js-expr #t)])
+                  (binding name analyzed-js-expr)))
                   let-list)]
             [analyzed-next (analyze-inst next index indexne)])
         (match analyzed-next
@@ -391,18 +444,26 @@
      0))
 
   (define (analyze-split bindings body index indexne)
-    (let ([binding-list (map (match-lambda [(list name js-expr) (list name (analyze-js-expr js-expr))]) bindings)]
+    (let ([binding-list (map
+                         (lambda (x)
+                           (let ([name (car x)]
+                                 [js-expr (cadr x)])
+                             (list name (analyze-js-expr js-expr))))
+                         bindings)]
           [analyzed-body (analyze-inst-imp body index indexne)])
       (match analyzed-body
         [(analyzed-value call sons num numne)
          (define (iter binding-list env)
-           (match binding-list
-             [(list) (call env)]
-             [(list-rest (list name analyzed-js-expr) rest)
-              (let ([value (analyzed-js-expr env)])
-                (if (too-early? value)
-                    env
-                    (iter rest (add-const-binding name (analyzed-js-expr env) env))))]))
+           (if (null? binding-list)
+               (call env)
+               (let* ([cur (car binding-list)]
+                      [rest (cdr binding-list)]
+                      [name (car cur)]
+                      [analyzed-js-expr (cadr cur)])
+                 (let ([value (analyzed-js-expr env)])
+                   (if (too-early? value)
+                       env
+                       (iter rest (add-const-binding name (analyzed-js-expr env) env)))))))
          (analyzed-value
           (lambda (env)
             (iter binding-list env))
@@ -411,27 +472,58 @@
           numne)])))
 
   (define (analyze-inst inst index indexne)
-    (match inst
-      [(list 'if js-expr branch)
-       (analyze-if js-expr branch index indexne)]
-      [(list 'if-else js-expr then-branch else-branch)
-       (analyze-if-else js-expr then-branch else-branch index indexne)]
-      [(list 'if-multi args branch mapping)
-       (analyze-if-multi args branch mapping index indexne)]
-      [(list 'if-else-multi args then-branch else-branch mapping)
-       (analyze-if-else-multi args then-branch else-branch mapping index indexne)]
-      [(list 'case-multi args branchs mapping)
-       (analyze-case-multi args branchs mapping index indexne)]
-      [(list 'return js-expr)
-       (analyze-return js-expr index indexne)]
-      [(list 'return-empty)
-       (analyze-return-empty index indexne)]
-      [(list 'bind name js-expr next)
-       (analyze-bind name js-expr next index indexne)]
-      [(cons 'begin lst)
-       (analyze-begin lst index indexne)]
-      [(list 'split bindings body)
-       (analyze-split bindings body index indexne)]))
+    (cond [(if? inst)
+           (analyze-if (if-arg inst)
+                       (if-branch inst)
+                       index
+                       indexne)]
+          [(if-else? inst)
+           (analyze-if-else (if-else-arg inst)
+                            (if-else-then-branch inst)
+                            (if-else-else-branch inst)
+                            index
+                            indexne)]
+          [(if-multi? inst)
+           (analyze-if-multi (if-multi-args inst)
+                             (if-multi-branch inst)
+                             (if-multi-mapping inst)
+                             index
+                             indexne)]
+          [(if-else-multi? inst)
+           (analyze-if-else-multi (if-else-multi-args inst)
+                                  (if-else-multi-then-branch inst)
+                                  (if-else-multi-else-branch inst)
+                                  (if-else-multi-mapping inst)
+                                  index
+                                  indexne)]
+          [(case-multi? inst)
+           (analyze-case-multi (case-multi-args inst)
+                               (case-multi-branchs inst)
+                               (case-multi-mapping inst)
+                               index
+                               indexne)]
+          [(return? inst)
+           (analyze-return (return-arg inst)
+                           index
+                           indexne)]
+          [(return-empty? inst)
+           (analyze-return-empty index indexne)]
+          [(bind? inst)
+           (analyze-bind (bind-name inst)
+                         (bind-body inst)
+                         (bind-inst inst)
+                         index
+                         indexne)]
+          [(begin? inst)
+           (analyze-begin (begin-seq inst)
+                          index
+                          indexne)]
+          [(split? inst)
+           (analyze-split (split-bindings inst)
+                          (split-body inst)
+                          index
+                          indexne)]))
+  
   (match (analyze-new-stream body 1 1)
     [(analyzed-new-stream son num numne)
      (analyzed-new-stream son (+ 1 num) (+ 1 numne))])
@@ -445,10 +537,17 @@
 (define (interpret-spec spec-input trace bindings)
   (define (construct-list glb-env)
     (match glb-env
-      [(global-env trace time _ _ _ _ _ _ _ _)
+      [(global-env trace time inputs output last-value _ sub-list sub-bv sym-bv-mapping sub-binding)
        (if (eq? (length (trace-event-lst trace)) time)
            '()
-           (let ([new-glb-env (advance-glb-env (struct-copy global-env glb-env [return-val 'undefined]))])
+           (let ([new-glb-env
+                  (advance-glb-env
+                   (global-env
+                    trace time inputs
+                    output last-value
+                    'undefined sub-list
+                    sub-bv sym-bv-mapping
+                    sub-binding))])
              (match new-glb-env
                [(global-env _ _ _ output _ return-val _ _ _ _)
                 (cons (if (undefined? return-val) (empty-event) (event output return-val)) (construct-list new-glb-env))])))]))
@@ -463,8 +562,8 @@
           (let* ([binding-lst (cons bindings (make-list (- numne 1) #f))]
                  [glb-env (global-env trace 0 inputs output 'undefined 'undefined sons (bv 1 numne) sym-bv-mapping binding-lst)])
             (construct-list glb-env))]))]))
-#|
-(define (main)
+
+#;(define (main)
   (define spec1 (spec '(a d) 'b '(f) '(t) '((a (if d (return (f a (prev a))))))))
   (define spec2 (spec '(a d) 'b '(f) '(t) '((a (if-else d (return (f a (prev a))) (return (g a (prev a))))))))
   (define spec3 (spec '(a d) 'b '(f) '(t) '((a (if-else d (return (f a (prev a))) (return a))))))
@@ -811,4 +910,4 @@
   (displayln (interpret-spec if-multi-spec if-multi-trace if-multi-binding))
   
   
-  )|#
+  )

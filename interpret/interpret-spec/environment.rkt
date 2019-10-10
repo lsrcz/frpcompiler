@@ -3,7 +3,6 @@
 ;(require rackunit)
 (require "analyzed.rkt")
 (require rosette/lib/match)
-(require rosette/base/struct/struct)
 
 (provide (all-defined-out))
 
@@ -30,46 +29,43 @@
   (list-ref (trace-event-lst trace) time))
 (define (get-value trace time name prev-num)
   (define (iter num remaining)
-    (match remaining
-      [(list)
-       (too-early)]
-      [(cons cur rest)
-       (let ([name-eq (and (not (empty-event? cur)) (eq? (event-name cur) name))]
-             [num-zero (= num 0)])
-         (if name-eq
-             (if num-zero
-                 (resolved (event-value cur))
-                 (iter (- num 1) rest))
-             (iter num rest)))]))
+    (if (null? remaining)
+        (too-early)
+        (let ([cur (car remaining)]
+              [rest (cdr remaining)])
+          (let ([name-eq (and (not (empty-event? cur)) (eq? (event-name cur) name))]
+                [num-zero (= num 0)])
+            (if name-eq
+                (if num-zero
+                    (resolved (event-value cur))
+                    (iter (- num 1) rest))
+                (iter num rest))))))
   (let* ([remaining (reverse (take (trace-event-lst trace) (+ 1 time)))])
     (iter prev-num remaining)))
 
 (define (resolve-environment env sym defaultval [only-constant #f])
   (define (resolve-input trace sym time)
     (define (iter sym num)
-      (match sym
-        [(list 'prev sym1) (iter sym1 (+ 1 num))]
-        [_
-         (let ([val (get-value trace time sym num)])
-           (if (too-early? val)
-               (let ([default (assoc sym defaultval)])
-                 (if default
-                     (resolve-environment env (cadr default) defaultval #t)
-                     (too-early)))
-               val))]))
+      (if (pair? sym)
+          (iter (cadr sym) (+ 1 num))
+          (let ([val (get-value trace time sym num)])
+            (if (too-early? val)
+                (let ([default (assoc sym defaultval)])
+                  (if default
+                      (resolve-environment env (cadr default) defaultval #t)
+                      (too-early)))
+                val))))
     (iter sym 0))
-  #;(define (resolve-list lst sym)
-    (let ([filtered (filter (match-lambda [(binding name value) (eq? name sym)]) lst)])
-      (if (null? filtered)
-          (not-found)
-          (resolved (binding-value (car filtered))))))
   (define (resolve-list lst sym)
-    (match lst
-      [(list) (not-found)]
-      [(cons (binding name value) rest)
-       (if (eq? name sym)
-           (resolved value)
-           (resolve-list rest sym))]))
+    (if (null? lst)
+        (not-found)
+        (let* ([cur (car lst)]
+               [rest (cdr lst)]
+               [name (binding-name cur)]
+               [value (binding-value cur)])
+          (if (eq? name sym)
+              (resolved value)
+              (resolve-list rest sym)))))
   (match env
     [(environment (global-env trace time inputs output last-value _ _ _ _ _)
                   (local-env stream-bindings const-bindings))
@@ -90,21 +86,27 @@
      (get-event-by-time trace time)]))
 
 (define (update-loc-env env new-loc-env)
-  (struct-copy environment env [loc-env new-loc-env]))
+  (match env
+    [(environment glb-env loc-env) (environment glb-env new-loc-env)]))
 (define (update-glb-env env new-glb-env)
-  (struct-copy environment env [glb-env new-glb-env]))
+  (match env
+    [(environment glb-env loc-env) (environment new-glb-env loc-env)]))
 
 (define (add-const-binding name value env)
   (update-loc-env
    env
    (let ([loc-env (environment-loc-env env)])
-     (struct-copy local-env loc-env
-                  [const-bindings
-                   (cons (binding name value)
-                         (local-env-const-bindings loc-env))]))))
+     (match loc-env
+       [(local-env stream-bindings const-bindings)
+        (local-env stream-bindings
+                   (cons (binding name value) const-bindings))]))))
 
 (define (advance-time-glb glb-env)
-  (struct-copy global-env glb-env [time (+ (global-env-time glb-env) 1)]))
+  (match glb-env
+    [(global-env trace time inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping sub-binding)
+     (global-env trace (+ time 1) inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping sub-binding)]))
 
 (define (advance-time env)
   (update-glb-env
@@ -116,39 +118,50 @@
   (update-loc-env
    env
    (let ([loc-env (environment-loc-env env)])
-     (struct-copy local-env loc-env
-                  [stream-bindings
-                   (cons (binding name value)
-                         (local-env-stream-bindings loc-env))]))))
+     (match loc-env
+       [(local-env stream-bindings const-bindings)
+        (local-env (cons (binding name value) stream-bindings)
+                   const-bindings)]))))
 
 (define (set-ret-value value env)
   (update-glb-env
    env
    (let ([glb-env (environment-glb-env env)])
-     (struct-copy global-env glb-env
-                  [last-value value]
-                  [return-val value]
-                  ))))
+   (match glb-env
+    [(global-env trace time inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping sub-binding)
+     (global-env trace time inputs output value value
+                 sub-list sub-bv sym-bv-mapping sub-binding)]))))
 
 (define (clear-ret-value env)
   (update-glb-env
    env
    (let ([glb-env (environment-glb-env env)])
-     (struct-copy global-env glb-env [return-val 'undefined]))))
+   (match glb-env
+    [(global-env trace time inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping sub-binding)
+     (global-env trace time inputs output last-value 'undefined
+                 sub-list sub-bv sym-bv-mapping sub-binding)]))))
 
 (define (sub-bv-mask value env)
   (update-glb-env
    env
    (let ([glb-env (environment-glb-env env)])
-     (struct-copy global-env glb-env
-                  [sub-bv (bvand value (global-env-sub-bv glb-env))]))))
+   (match glb-env
+    [(global-env trace time inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping sub-binding)
+     (global-env trace time inputs output last-value return-val
+                 sub-list (bvand value sub-bv) sym-bv-mapping sub-binding)]))))
 
 (define (sub-bv-set value env)
   (update-glb-env
    env
    (let ([glb-env (environment-glb-env env)])
-     (struct-copy global-env glb-env
-                  [sub-bv (bvor value (global-env-sub-bv glb-env))]))))
+   (match glb-env
+    [(global-env trace time inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping sub-binding)
+     (global-env trace time inputs output last-value return-val
+                 sub-list (bvor value sub-bv) sym-bv-mapping sub-binding)]))))
 
 (define (list-update v idx lst)
   (if (= idx 0)
@@ -160,11 +173,13 @@
    env
    (let ([glb-env (environment-glb-env env)]
          [loc-env (environment-loc-env env)])
-     (struct-copy global-env glb-env
-                  [sub-binding
-                   (list-update (local-env-const-bindings loc-env) index
-                                (global-env-sub-binding glb-env))
-                   ]))))
+   (match glb-env
+    [(global-env trace time inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping sub-binding)
+     (global-env trace time inputs output last-value return-val
+                 sub-list sub-bv sym-bv-mapping
+                 (list-update (local-env-const-bindings loc-env) index
+                              sub-binding))]))))
 
 (define (is-subscribed? name glb-env)
   (match glb-env
@@ -177,14 +192,15 @@
 
 (define (advance-glb-env glb-env)
   (define (get-sub name sub-list)
-    (match sub-list
-      [(list) 'no]
-      [(cons cur rest)
-       (match cur
-         [(call-def namec _ _)
-          (if (eq? namec name)
-              cur
-              (get-sub name rest))])]))
+    (if (null? sub-list)
+        'no
+        (let ([cur (car sub-list)]
+              [rest (cdr sub-list)])
+          (match cur
+            [(call-def namec _ _)
+             (if (eq? namec name)
+                 cur
+                 (get-sub name rest))]))))
   (match glb-env
     [(global-env trace time _ _ _ _ sub-list _ _ sub-binding)
      (let ([evt (get-event-by-time trace time)])

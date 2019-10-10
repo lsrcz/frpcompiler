@@ -1,5 +1,6 @@
 #lang rosette/safe
 
+(require "../ast/syntax.rkt")
 (require rosette/lib/match)
 
 (provide (all-defined-out))
@@ -11,67 +12,88 @@
   (define (iter body)
     (append-map (lambda (x) (collect-son-inst (cadr x))) body))
   (define (collect-son-inst inst)
-    (match inst
-      [(list 'if _ branch) (collect-son-inst branch)]
-      [(list 'if-else _ then-branch else-branch)
-       (append (collect-son-inst then-branch) (collect-son-inst else-branch))]
-      [(list 'if-multi _ branch _) (collect-son-inst branch)]
-      [(list 'if-else-multi _ then-branch else-branch _)
-       (append (collect-son-inst then-branch) (collect-son-inst else-branch))]
-      [(list 'case-multi _ branchs _) (append* (map collect-son-inst branchs))]
-      [(list 'return _) '()]
-      [(list 'return-empty) '()]
-      [(cons 'begin lst) (collect-son-inst (last lst))]
-      [(list 'bind _ _ next) (collect-son-inst next)]
-      [(list 'split _ body) (collect-son-inst body)]
-      [(list 'new-stream body) (cons body (collect-son body))]
-      [(list 'new-stream-initial body _) (cons body (collect-son body))]
-      [(list 'new-stream-seed body _) (cons body (collect-son body))]
-      [(list 'empty-stream) (list)]))
+    (cond [(if? inst) (collect-son-inst (if-branch inst))]
+          [(if-else? inst)
+           (append (collect-son-inst (if-else-then-branch inst))
+                   (collect-son-inst (if-else-else-branch inst)))]
+          [(if-multi? inst) (collect-son-inst (if-multi-branch inst))]
+          [(if-else-multi? inst)
+           (append (collect-son-inst (if-else-multi-then-branch inst))
+                   (collect-son-inst (if-else-multi-else-branch inst)))]
+          [(case-multi? inst)
+           (append* (map collect-son-inst (case-multi-branchs inst)))]
+          [(return? inst) '()]
+          [(return-empty? inst) '()]
+          [(begin? inst) (collect-son-inst (last (begin-seq inst)))]
+          [(bind? inst) (collect-son-inst (bind-inst inst))]
+          [(split? inst) (collect-son-inst (split-body inst))]
+          [(new-stream? inst)
+           (let ([body (new-stream-body inst)])
+             (cons body (collect-son body)))]
+          [(new-stream-initial? inst)
+           (let ([body (new-stream-initial-body inst)])
+             (cons body (collect-son body)))]
+          [(new-stream-seed? inst)
+           (let ([body (new-stream-seed-body inst)])
+             (cons body (collect-son body)))]
+          [(empty-stream? inst) '()]))
   (iter body))
 
 (define (collect-direct-son-grouped body)
   (define (iter body)
     (map (lambda (x) (collect-direct-son-inst (cadr x))) body))
   (define (collect-direct-son-inst inst)
-    (match inst
-      [(list 'if _ branch) (collect-direct-son-inst branch)]
-      [(list 'if-else _ then-branch else-branch)
-       (append (collect-direct-son-inst then-branch) (collect-direct-son-inst else-branch))]
-      [(list 'if-multi _ branch _) (collect-direct-son-inst branch)]
-      [(list 'if-else-multi _ then-branch else-branch _)
-       (append (collect-direct-son-inst then-branch) (collect-direct-son-inst else-branch))]
-      [(list 'case-multi _ branchs _)
-       (append* (map collect-direct-son-inst branchs))]
-      [(list 'return _) '()]
-      [(list 'return-empty) '()]
-      [(cons 'begin lst) (collect-direct-son-inst (last lst))]
-      [(list 'bind _ _ next) (collect-direct-son-inst next)]
-      [(list 'split _ body) (collect-direct-son-inst body)]
-      [(list 'new-stream body) (list body)]
-      [(list 'new-stream-initial body _) (list body)]
-      [(list 'new-stream-seed body _) (list body)]
-      [(list 'empty-stream) (list)]))
+    (cond [(if? inst) (collect-direct-son-inst (if-branch inst))]
+          [(if-else? inst)
+           (append (collect-direct-son-inst (if-else-then-branch inst))
+                   (collect-direct-son-inst (if-else-else-branch inst)))]
+          [(if-multi? inst) (collect-direct-son-inst (if-multi-branch inst))]
+          [(if-else-multi? inst)
+           (append (collect-direct-son-inst (if-else-multi-then-branch inst))
+                   (collect-direct-son-inst (if-else-multi-else-branch inst)))]
+          [(case-multi? inst)
+           (append* (map collect-direct-son-inst (case-multi-branchs inst)))]
+          [(return? inst) '()]
+          [(return-empty? inst) '()]
+          [(begin? inst) (collect-direct-son-inst (last (begin-seq inst)))]
+          [(bind? inst) (collect-direct-son-inst (bind-inst inst))]
+          [(split? inst) (collect-direct-son-inst (split-body inst))]
+          [(new-stream? inst)
+           (let ([body (new-stream-body inst)])
+             (list body))]
+          [(new-stream-initial? inst)
+           (let ([body (new-stream-initial-body inst)])
+             (list body))]
+          [(new-stream-seed? inst)
+           (let ([body (new-stream-seed-body inst)])
+             (list body))]
+          [(empty-stream? inst) '()]))
   (iter body))
 
-(define (collect-sibling inst-imp)
-  (match inst-imp
-    [(list 'if _ branch) (collect-sibling branch)]
-    [(list 'if-else _ then-branch else-branch)
-     (append (collect-sibling then-branch)
-             (collect-sibling else-branch))]
-    [(list 'if-multi _ branch _) (collect-sibling branch)]
-    [(list 'if-else-multi _ then-branch else-branch _)
-     (append (collect-sibling then-branch)
-             (collect-sibling else-branch))]
-    [(list 'case-multi _ branchs _)
-     (append* (map collect-sibling branchs))]
-    [(list 'bind _ _ next) (collect-sibling next)]
-    [(cons 'begin lst) (collect-sibling (last lst))]
-    [(list 'new-stream body) (list body)]
-    [(list 'new-stream-initial body _) (list body)]
-    [(list 'new-stream-seed body _) (list body)]
-    [(list 'empty-stream) (list)]))
+(define (collect-sibling inst)
+  (cond [(if? inst) (collect-sibling (if-branch inst))]
+        [(if-else? inst)
+         (append (collect-sibling (if-else-then-branch inst))
+                 (collect-sibling (if-else-else-branch inst)))]
+        [(if-multi? inst) (collect-sibling (if-multi-branch inst))]
+        [(if-else-multi? inst)
+         (append (collect-sibling (if-else-multi-then-branch inst))
+                 (collect-sibling (if-else-multi-else-branch inst)))]
+        [(case-multi? inst)
+         (append* (map collect-sibling (case-multi-branchs inst)))]
+
+        [(begin? inst) (collect-sibling (last (begin-seq inst)))]
+        [(bind? inst) (collect-sibling (bind-inst inst))]
+        [(new-stream? inst)
+         (let ([body (new-stream-body inst)])
+           (list body))]
+        [(new-stream-initial? inst)
+         (let ([body (new-stream-initial-body inst)])
+           (list body))]
+        [(new-stream-seed? inst)
+         (let ([body (new-stream-seed-body inst)])
+           (list body))]
+        [(empty-stream? inst) '()]))
 
 (define (collect-streams body built)
   (define (collect-streams-inst inst father sibling built)
@@ -80,38 +102,61 @@
                          (collect-son stream) (collect-direct-son-grouped stream)))
     (define (build-empty-dependency ref)
       (empty-dependency ref (list father) sibling))
-    (match inst
-      [(list 'if _ branch) (collect-streams-inst branch father sibling (cons (build-empty-dependency inst) built))]
-      [(list 'if-else _ then-branch else-branch)
-       (collect-streams-inst else-branch father sibling
-                             (collect-streams-inst then-branch father sibling built))]
-      [(list 'if-multi _ branch _) (collect-streams-inst branch father sibling (cons (build-empty-dependency inst) built))]
-      [(list 'if-else-multi _ then-branch else-branch _)
-       (collect-streams-inst else-branch father sibling
-                             (collect-streams-inst then-branch father sibling built))]
-      [(list 'case-multi _ branchs _)
-       (define (iter branchs)
-         (match branchs
-           [(list) built]
-           [(cons cur rest)
-            (collect-streams-inst cur father sibling (iter rest))]))
-       (iter branchs)]
-      [(list 'return _) built]
-      [(list 'return-empty) built]
-      [(cons 'begin lst) (collect-streams-inst (last lst) father sibling built)]
-      [(list 'bind _ _ next) (collect-streams-inst next father sibling built)]
-      [(list 'split _ body)
-       (collect-streams-inst body father (collect-sibling body) built)]
-      [(list 'new-stream body) (collect-in-new-stream body (cons (build-dependency body) built))]
-      [(list 'new-stream-initial body _) (collect-in-new-stream body (cons (build-dependency body) built))]
-      [(list 'new-stream-seed body _) (collect-in-new-stream body (cons (build-dependency body) built))]
-      [(list 'empty-stream) (cons (build-empty-dependency inst) built)]))
+    (cond [(if? inst)
+           (let ([branch (if-branch inst)])
+             (collect-streams-inst branch father sibling (cons (build-empty-dependency inst) built)))]
+          [(if-else? inst)
+           (let ([then-branch (if-else-then-branch inst)]
+                 [else-branch (if-else-else-branch inst)])
+             (collect-streams-inst else-branch father sibling
+                             (collect-streams-inst then-branch father sibling built)))]
+          [(if-multi? inst)
+           (let ([branch (if-multi-branch inst)])
+             (collect-streams-inst branch father sibling (cons (build-empty-dependency inst) built)))]
+          [(if-else-multi? inst)
+           (let ([then-branch (if-else-multi-then-branch inst)]
+                 [else-branch (if-else-multi-else-branch inst)])
+             (collect-streams-inst else-branch father sibling
+                             (collect-streams-inst then-branch father sibling built)))]
+          [(case-multi? inst)
+           (let ([branchs (case-multi-branchs inst)])
+             (define (iter branchs)
+               (if (null? branchs)
+                   built
+                   (let ([cur (car branchs)]
+                         [rest (cdr branchs)])
+                     (collect-streams-inst cur father sibling (iter rest)))))
+             (iter branchs))]
+          [(return? inst) built]
+          [(return-empty? inst) built]
+          [(begin? inst)
+           (let ([lst (begin-seq inst)])
+             (collect-streams-inst (last lst) father sibling built))]
+          [(bind? inst)
+           (let ([next (bind-inst inst)])
+             (collect-streams-inst next father sibling built))]
+          [(split? inst)
+           (let ([body (split-body inst)])
+             (collect-streams-inst body father (collect-sibling body) built))]
+          [(new-stream? inst)
+           (let ([body (new-stream-body inst)])
+             (collect-in-new-stream body (cons (build-dependency body) built)))]
+          [(new-stream-initial? inst)
+           (let ([body (new-stream-initial-body inst)])
+             (collect-in-new-stream body (cons (build-dependency body) built)))]
+          [(new-stream-seed? inst)
+           (let ([body (new-stream-seed-body inst)])
+             (collect-in-new-stream body (cons (build-dependency body) built)))]
+          [(empty-stream? inst)
+           (cons (build-empty-dependency inst) built)]))
   (define (collect-in-new-stream father built)
     (define (iter body built)
-      (match body
-        [(list) built]
-        [(cons (list _ inst-body) rest)
-         (iter rest (collect-streams-inst inst-body father '()#|won't be used|# built))]))
+      (if (null? body)
+          built
+          (let* ([cur (car body)]
+                 [rest (cdr body)]
+                 [inst-body (cadr cur)])
+            (iter rest (collect-streams-inst inst-body father '()#|won't be used|# built)))))
     (iter father built))
   (reverse (collect-in-new-stream body (cons (stream-dependency body '() '() (collect-son body) (collect-direct-son-grouped body)) built))))
 
@@ -127,34 +172,39 @@
       (null? (filter (lambda (x) (not x)) (append-map (lambda (x) (map already-built? x)) lst))))
     (define (get-result stream)
       (define (iter dependency-map)
-        (match dependency-map
-          [(list) 'error]
-          [(cons (cons (stream-dependency cur _ _ _ _) result) rest)
-           (if (eq? cur stream)
-               result
-               (iter rest))]))
+        (if (null? dependency-map)
+            'error
+            (let* ([cur-dep (car dependency-map)]
+                   [rest (cdr dependency-map)]
+                   [result (cdr cur-dep)]
+                   [cur (stream-dependency-stream (car cur-dep))])
+              (if (eq? cur stream)
+                  result
+                  (iter rest)))))
       (iter dependency-map))
     (define (cart-product-append list1 list2)
       (append-map (lambda (x) (map (lambda (y) (append x y)) list2)) list1))
     (define (cart-product-append-list-of-list list-of-list)
-      (match list-of-list
-        [(list) '(())]
-        [(cons cur rest)
-         (cart-product-append cur (cart-product-append-list-of-list rest))]))
+      (if (null? list-of-list)
+          '(())
+          (let ([cur (car list-of-list)]
+                [rest (cdr list-of-list)])
+            (cart-product-append cur (cart-product-append-list-of-list rest)))))
     (define (build stream direct)
       (define built-result-for-direct (map (lambda (x) (cons '() (append-map get-result x))) direct))
       (map (lambda (x) (cons stream x)) (cart-product-append-list-of-list built-result-for-direct)))
     (define (iter lst built)
-      (match lst
-        [(list) (reverse built)]
-        [(cons cur rest)
-         (match cur
-           [(cons sd result)
-            (match sd
-              [(stream-dependency stream _ _ _ direct)
-               (if (or result (not (already-built-deep-list? direct)))
-                   (iter rest (cons cur built))
-                   (update (append (reverse built) (list (cons sd (build stream direct))) rest)))])])]))
+      (if (null? lst)
+          (reverse built)
+          (let* ([cur (car lst)]
+                 [rest (cdr lst)]
+                 [sd (car cur)]
+                 [result (cdr cur)]
+                 [stream (stream-dependency-stream sd)]
+                 [direct (stream-dependency-direct-son sd)])
+            (if (or result (not (already-built-deep-list? direct)))
+                (iter rest (cons cur built))
+                (update (append (reverse built) (list (cons sd (build stream direct))) rest))))))
     (iter dependency-map '()))
   (update initial-mapping))
 
@@ -162,23 +212,23 @@
 (struct empty-bv-rep (unsub) #:transparent)
 
 (define (get-unsub rep)
-  (match rep
-    [(stream-bv-rep _ unsub) unsub]
-    [(empty-bv-rep unsub) unsub]))
+  (if (stream-bv-rep? rep)
+      (stream-bv-rep-unsub rep)
+      (empty-bv-rep-unsub rep)))
 
 (define (get-self rep)
-  (match rep
-    [(stream-bv-rep self _) self]))
+  (stream-bv-rep-self rep))
 
 (define (build-bitvector-transition dependency-list)
   (define non-empty-dependency-list (filter stream-dependency? dependency-list))
   (define stream-list (map stream-dependency-stream non-empty-dependency-list))
   (define len (length stream-list))
   (define (build-mapping stream-list last-bv)
-    (match stream-list
-      [(list) '()]
-      [(cons stream rest)
-       (cons (cons stream last-bv) (build-mapping rest (bvshl last-bv (bv 1 len))))]))
+    (if (null? stream-list)
+        '()
+        (let ([stream (car stream-list)]
+              [rest (cdr stream-list)])
+          (cons (cons stream last-bv) (build-mapping rest (bvshl last-bv (bv 1 len)))))))
   (define mapping (build-mapping stream-list (bv 1 len)))
   (define (get-sibling-sons sibling)
     (remove-duplicates
@@ -191,15 +241,18 @@
         (bv 0 len)
         (apply bvor (map (lambda (x) (cdr (assoc x mapping))) lst))))
   (define (iter dependency-list)
-    (match dependency-list
-      [(list) '()]
-      [(cons cur rest)
-       (cons (match cur
-               [(stream-dependency stream _ sibling _ _)
-                (stream-bv-rep (cdr (assoc stream mapping)) (bvnot (stream-list-to-bv (get-sibling-sons sibling))))]
-               [(empty-dependency _ _ sibling)
-                (empty-bv-rep (bvnot (stream-list-to-bv (get-sibling-sons sibling))))])
-             (iter rest))]))
+    (if (null? dependency-list)
+        '()
+        (let ([cur (car dependency-list)]
+              [rest (cdr dependency-list)])
+          (cons
+           (if (stream-dependency? cur)
+               (stream-bv-rep
+                (cdr (assoc (stream-dependency-stream cur) mapping))
+                (bvnot (stream-list-to-bv (get-sibling-sons (stream-dependency-sibling cur)))))
+               (empty-bv-rep (bvnot (stream-list-to-bv (get-sibling-sons (empty-dependency-sibling cur))))))
+           
+           (iter rest)))))
   (iter dependency-list))
 
 (define (build-symbol-bv-mapping dependency-list)
@@ -207,16 +260,20 @@
   (define stream-list (map stream-dependency-stream non-empty-dependency-list))
   (define len (length stream-list))
   (define (build-mapping stream-list last-bv)
-    (match stream-list
-      [(list) '()]
-      [(cons stream rest)
-       (cons (cons stream last-bv) (build-mapping rest (bvshl last-bv (bv 1 len))))]))
+    (if (null? stream-list)
+        '()
+        (let ([stream (car stream-list)]
+              [rest (cdr stream-list)])
+          (cons (cons stream last-bv) (build-mapping rest (bvshl last-bv (bv 1 len)))))))
   (define mapping (build-mapping stream-list (bv 1 len)))
   (define (walk-mapping mapping)
-    (match mapping
-      [(list) '()]
-      [(cons (cons stream bv) rest)
-       (append (map (lambda (x) (cons (car x) bv)) stream) (walk-mapping rest))]))
+    (if (null? mapping)
+        '()
+        (let* ([cur (car mapping)]
+               [stream (car cur)]
+               [bv (cdr cur)]
+               [rest (cdr mapping)])
+          (append (map (lambda (x) (cons (car x) bv)) stream) (walk-mapping rest)))))
   (walk-mapping mapping))
          
 
