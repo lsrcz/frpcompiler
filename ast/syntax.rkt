@@ -14,7 +14,7 @@
 (define if-else-multi-args cadr)
 (define if-else-multi-then-branch caddr)
 (define if-else-multi-else-branch cadddr)
-(define if-else-multi-mapping caddddr)
+(define if-else-multi-mapping (lambda (x) (car (cddddr x))))
 (define case-multi-args cadr)
 (define case-multi-branchs caddr)
 (define case-multi-mapping cadddr)
