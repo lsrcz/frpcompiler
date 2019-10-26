@@ -1,4 +1,5 @@
-#lang rosette/safe
+#lang rosette
+(error-print-width 100000)
 
 (require "../test/test-spec.rkt")
 (require "../interpret/interpret-spec/spec.rkt")
@@ -63,7 +64,7 @@
    (binding 'on on)
    (binding 'off off)))
 
-(define bindings
+(define concrete-all-bindings
   (append non-symbolic-bindings
           (list
            (binding 'f1 f1)
@@ -74,10 +75,14 @@
 (define-symbolic f2s (~> boolean? boolean? boolean? boolean? integer?))
 
 (define symbolic-bindings
-  (append non-symbolic-bindings
           (list
-           (binding 'f1 f1s)
-           (binding 'f2 f2s))))
+           (list (binding 'f1 f1s) 4 3)
+           (list (binding 'f2 f2s) 4 3)))
+
+(define symbolic-all-bindings
+  (append non-symbolic-bindings
+          (map car symbolic-bindings)))
+
 
 (define trace-input
   (trace
@@ -101,16 +106,6 @@
         (empty-event)))
 
 (define stream-body-for-testing-analyze (spec-body sprinkler-spec))
-
-(eq? trace-result (interpret-spec sprinkler-spec trace-input bindings))
-
-
-
-
-(define m (time (synthesize #:forall '()
-            #:guarantee (assert (equal? (interpret-spec sprinkler-spec trace-input symbolic-bindings)
-                                        trace-result)))))
-
 
 
 (define (get-single-symbolic-event name constructor)
@@ -136,25 +131,11 @@
 
 (define (clock-constructor) (choose* 'six 'sixten))
 (define (motion-constructor) (choose* 'detected 'not-detected))
-(define sym-trace (get-symbolic-trace (list
-                                       (cons 'clock clock-constructor)
-                                       (cons 'motion motion-constructor)) 8))
+(define constructor-list (list
+                          (cons 'clock clock-constructor)
+                          (cons 'motion motion-constructor)))
+(define sym-trace (get-symbolic-trace constructor-list 8))
 
-(define model (synthesize #:forall '()
-                          #:guarantee (assert (equal? trace-input sym-trace))))
-
-(define m1 (time (synthesize #:forall '()
-                       #:guarantee (begin
-                                     (assert (not (equal? (interpret-spec sprinkler-spec sym-trace (evaluate symbolic-bindings m))
-                                                          (interpret-spec sprinkler-spec sym-trace symbolic-bindings))))
-                                     (assert (equal? (interpret-spec sprinkler-spec trace-input symbolic-bindings) trace-result))))))
-
-(define f1c (evaluate f1s m))
-(define f1c1 (evaluate f1s m1))
-(define-symbolic b1 boolean?)
-(define-symbolic b2 boolean?)
-(define-symbolic b3 boolean?)
-(define-symbolic b4 boolean?)
 #|
 (f1c b1 b2 b3 b4)
 (f1c1 b1 b2 b3 b4)
@@ -164,41 +145,87 @@
 (car '())
 |#
 
-(define (synthesize-spec spec bindings sym-trace init-trace init-result annotate-func)
-  (define (iter inout last-model)
-    (define (ground-truth-constraint inout)
-      (if (null? inout)
-          (void)
-          (let* ([cur (car inout)]
-                 [i (car cur)]
-                 [o (cdr cur)]
-                 [rest (cdr inout)])
-            (begin
-              (assert (equal? (interpret-spec spec i bindings) o))
-              (ground-truth-constraint rest)))))
-    (define (distinguish-constraint)
-      (assert (not (equal? (interpret-spec spec sym-trace (evaluate bindings last-model))
-                           (interpret-spec spec sym-trace bindings)))))
-    (define new-model (time (synthesize #:forall '()
-                                        #:guarantee (begin
-                                                      (ground-truth-constraint inout)
-                                                      (distinguish-constraint)
-                                                      ))))
-    (if (unsat? new-model)
+(define (synthesize-spec spec symbolic-bindings
+                         concrete-bindings sym-cons-list max-length init-trace init-result annotate-func)
+  (define bindings (append (map car symbolic-bindings) concrete-bindings))
+  (define sym-trace (get-symbolic-trace sym-cons-list 1))
+    (define (build-symbolic-constraints symbolic-bindings)
+    (define (build-symbolic-list num)
+      (if (= num 0)
+          '()
+          (begin
+            (define-symbolic* x boolean?)
+            (cons x (build-symbolic-list (- num 1))))))
+    (define (build-one symbolic-binding)
+      (let ([f (binding-value (car symbolic-binding))]
+            [arity (cadr symbolic-binding)]
+            [max (caddr symbolic-binding)])
+        (define l (build-symbolic-list arity))
+        (cons l (and (>= (apply f l) 0) (< (apply f l) max)))))
+    (if (null? symbolic-bindings)
+        (cons (list) #t)
+        (let* ([nxt (build-symbolic-constraints (cdr symbolic-bindings))]
+               [nxt-lst (car nxt)]
+               [nxt-constraint (cdr nxt)]
+               [this (build-one (car symbolic-bindings))]
+               [this-lst (car this)]
+               [this-constraint (cdr this)])
+          (cons (append nxt-lst this-lst) (and nxt-constraint this-constraint)))))
+  (define symbolic-constraint (build-symbolic-constraints symbolic-bindings))
+  (define (iter inout last-model cur-length)
+    (if (> cur-length max-length)
         last-model
-        (let* ([complete-model (complete-solution new-model (symbolics (cons sym-trace bindings)))]
-               [in (evaluate sym-trace complete-model)]
-               [out (annotate-func in)])
-          (displayln "NEW TRACE")
-          (displayln in)
-          (displayln out)
-          (displayln (evaluate (interpret-spec sprinkler-spec sym-trace bindings) complete-model))
-          (iter (cons (cons in out) inout) complete-model))))
+        (begin
+                          (displayln "---------")
+          (define sym-trace (get-symbolic-trace sym-cons-list cur-length))
+
+          (define (ground-truth-constraint inout)
+            
+            (if (null? inout)
+                (void)
+                (let* ([cur (car inout)]
+                       [i (car cur)]
+                       [o (cdr cur)]
+                       [rest (cdr inout)])
+                  (begin
+                    (assert (equal? (interpret-spec spec i bindings) o))
+                    (ground-truth-constraint rest)))))
+          (define concrete-bindings (evaluate bindings last-model))
+          (define (distinguish-constraint)
+           (assert (not (equal? (interpret-spec spec sym-trace concrete-bindings)
+                        (interpret-spec spec sym-trace bindings)))))
+          (define new-model (time (synthesize #:forall '()
+                                              #:guarantee (begin
+                                                            (ground-truth-constraint inout)
+                                                            (distinguish-constraint)
+                                                            ))))
+          ;(displayln inout)
+          
+          (if (unsat? new-model)
+              (iter inout last-model (+ 1 cur-length))
+              (let* ([complete-model (complete-solution new-model (symbolics (interpret-spec spec sym-trace bindings)))]
+                     [in (evaluate sym-trace complete-model)]
+                     [out (annotate-func in)]
+                     [newinout (cons (cons in out) inout)])
+
+                (displayln "NEW TRACE")
+                (display "IN: ")
+                (displayln in)
+                (display "GROUND TRUTH:   ")
+                (displayln out)
+                
+                (define new-model (time (synthesize #:forall (car symbolic-constraint)
+                                                    #:guarantee (begin
+                                                                  (ground-truth-constraint newinout)
+                                                                  (assert (cdr symbolic-constraint))
+                                                                  ))))
+                ;(displayln (evaluate  (interpret-spec spec in bindings) complete-model))
+                (iter newinout new-model cur-length))))))
   (let* ([initial-model (complete-solution
                          (synthesize #:forall '()
                                      #:guarantee (assert (equal? init-result (interpret-spec spec init-trace bindings))))
-                         (symbolics (cons sym-trace bindings)))])
-    (iter (list (cons init-trace init-result)) initial-model)))
+                         (symbolics bindings))])
+    (iter (list (cons init-trace init-result)) initial-model 1)))
 
 (define (annotate-func in)
   (displayln in)
@@ -210,11 +237,11 @@
     (interpret-spec input-spec in input-bindings))
   annotate-func)
 
-(define synth-m (synthesize-spec sprinkler-spec symbolic-bindings sym-trace (trace (list)) (list)
-                                 (annotate-groundtruth sprinkler-spec bindings)))
+(define synth-m (synthesize-spec sprinkler-spec symbolic-bindings non-symbolic-bindings constructor-list 5 (trace (list)) (list)
+                                 (annotate-groundtruth sprinkler-spec concrete-all-bindings)))
 
-(verify (eq? (interpret-spec sprinkler-spec sym-trace (evaluate symbolic-bindings synth-m))
-             (interpret-spec sprinkler-spec sym-trace bindings)))
+(verify (eq? (interpret-spec sprinkler-spec sym-trace (evaluate symbolic-all-bindings synth-m))
+             (interpret-spec sprinkler-spec sym-trace concrete-all-bindings)))
 
 (define poster-trace
   (trace
@@ -228,14 +255,13 @@
     (event 'clock sixten)
     (event 'motion not-detected))))
 
-(define synth-m1 (synthesize-spec sprinkler-spec symbolic-bindings sym-trace poster-trace
-                                  (interpret-spec sprinkler-spec poster-trace bindings)
-                                 (annotate-groundtruth sprinkler-spec bindings)))
+(define synth-m1 (synthesize-spec sprinkler-spec symbolic-bindings non-symbolic-bindings constructor-list 5 poster-trace
+                                  (interpret-spec sprinkler-spec poster-trace concrete-all-bindings)
+                                 (annotate-groundtruth sprinkler-spec concrete-all-bindings)))
 
-(verify (eq? (interpret-spec sprinkler-spec sym-trace (evaluate symbolic-bindings synth-m))
-             (interpret-spec sprinkler-spec sym-trace bindings)))
+(verify (eq? (interpret-spec sprinkler-spec sym-trace (evaluate symbolic-all-bindings synth-m))
+             (interpret-spec sprinkler-spec sym-trace concrete-all-bindings)))
 
-(define-symbolic f (~> integer? integer?))
 
 
 
