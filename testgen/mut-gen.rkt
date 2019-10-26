@@ -1,7 +1,7 @@
 #lang rosette/safe
 
 (require rosette/lib/match
-         "../test/test-spec.rkt"
+         "../ast/spec.rkt"
          "../ast/syntax.rkt")
 
 (provide (all-defined-out))

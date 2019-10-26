@@ -2,6 +2,7 @@
 
 (require "syntax.rkt")
 (require "../test/test-spec.rkt")
+(require "spec.rkt")
 (provide monad-desugar monad-desugar-spec)
 
 (define (monad-desugar spec)
@@ -68,8 +69,8 @@
 
 (define (monad-desugar-spec spec-input)
   (match spec-input
-    [(spec inputs output funclist constantlist body)
-     (spec inputs output funclist constantlist (map monad-desugar body))]))
+    [(spec inputs output funclist constantlist defaultval body)
+     (spec inputs output funclist constantlist defaultval (map monad-desugar body))]))
 
 (define (main)
   (println (monad-desugar

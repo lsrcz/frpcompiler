@@ -4,7 +4,7 @@
          "../interpret/interpret-spec/analyzed.rkt"
          "../interpret/interpret-spec/environment.rkt"
          "../interpret/interpret-spec/spec.rkt"
-         "../test/test-spec.rkt"
+         "../ast/spec.rkt"
          "test-suite.rkt"
          "mut-gen.rkt"
          rackunit

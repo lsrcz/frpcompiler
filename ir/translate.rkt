@@ -8,6 +8,7 @@
 (require "../util/util.rkt")
 (require "../test/test-spec.rkt")
 (require "../ast/nested-ref.rkt")
+(require "../ast/spec.rkt")
 
 (provide (all-defined-out))
 

@@ -1,6 +1,7 @@
 #lang racket
 
 (require "../test/test-spec.rkt")
+(require "spec.rkt")
 (require rackunit)
 
 (provide check-spec)

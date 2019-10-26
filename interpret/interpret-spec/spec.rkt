@@ -1,7 +1,7 @@
 #lang rosette/safe
 
 (require "environment.rkt")
-(require "../../test/test-spec.rkt")
+(require "../../ast/spec.rkt")
 (require "analyzed.rkt")
 (require "../subscribe-fsm.rkt")
 (require "../../ast/syntax.rkt")

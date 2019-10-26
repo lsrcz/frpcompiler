@@ -3,8 +3,9 @@
 (require "sym-trace.rkt"
          "../interpret/interpret-spec/analyzed.rkt"
          "../interpret/interpret-spec/environment.rkt"
-         "../interpret/interpret-spec/spec.rkt"
-         "../test/test-spec.rkt")
+         "../interpret/interpret-spec/spec.rkt")
+
+(require "../ast/spec.rkt")
 
 (define (find-input spec binding sym-trace output)
   (time (synthesize #:forall (list)

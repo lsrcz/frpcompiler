@@ -3,6 +3,7 @@
 (require "syntax.rkt")
 (require "../util/util.rkt")
 (require "../test/test-spec.rkt")
+(require "spec.rkt")
 
 (provide extract extract-spec)                                                                                                                                                
                                                                                                                                                                          
@@ -99,8 +100,8 @@
 
 (define (extract-spec spec-input)
   (match spec-input
-    [(spec inputs output funclist constantlist body)
-     (spec inputs output funclist constantlist (map extract body))]))
+    [(spec inputs output funclist constantlist defaultval body)
+     (spec inputs output funclist constantlist defaultval (map extract body))]))
 
 (require "monad-desugar.rkt")
 

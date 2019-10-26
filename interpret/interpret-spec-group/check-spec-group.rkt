@@ -2,6 +2,7 @@
 
 (require "spec-group-definition.rkt")
 (require "../test/test-spec.rkt")
+(require "../ast/spec.rkt")
 (require rackunit)
 
 

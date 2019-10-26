@@ -1,8 +1,8 @@
 #lang rosette/safe
 
-(provide (all-defined-out))
+(require "../ast/spec.rkt")
 
-(struct spec (inputs output funclist constantlist defaultval body) #:transparent)
+(provide (all-defined-out))
 
 (define drawing-spec
   (spec

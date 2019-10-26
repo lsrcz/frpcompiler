@@ -5,6 +5,7 @@
 (require "analyzed.rkt")
 (require "spec-group-definition.rkt")
 (require "../subscribe-fsm.rkt")
+(require "../ast/spec.rkt")
 (require rackunit)
 (require rosette/lib/match)
 (require rosette/base/struct/struct)
