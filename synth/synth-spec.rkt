@@ -1,10 +1,10 @@
 #lang rosette
 (error-print-width 100000)
 
-(require "../test/test-spec.rkt")
 (require "../interpret/interpret-spec/spec.rkt")
 (require "../interpret/interpret-spec/environment.rkt")
 (require "../interpret/subscribe-fsm.rkt")
+(require "../ast/spec.rkt")
 (require rosette/lib/angelic)
 
 (define sprinkler-spec
