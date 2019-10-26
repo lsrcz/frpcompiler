@@ -89,9 +89,11 @@
         (define (iter inputs-map)
           (if (null? inputs-map)
               (error "this should not happen")
-              (if (eq? (input-inst-name (car inputs-map)) input)
-                  (car inputs-map)
-                  (iter (cdr inputs-map)))))
+              (let* ([cur (car inputs-map)]
+                     [name ((if (input-inst? cur) input-inst-name input-init-inst-name) cur)])
+                (if (eq? name input)
+                    (car inputs-map)
+                    (iter (cdr inputs-map))))))
         (iter inputs-map))
       (define (args-to-input-insts args)
         (map search-inputs-map args))
@@ -358,21 +360,25 @@
                  (iter (update inputs-map name num) (cdr prevs))]))))
       (iter (map (lambda (x) (list x 0)) inputs) prevs))
 
-    (define (prev-map-to-inputs-map inputs-prev-map)
+    (define (prev-map-to-inputs-map inputs-prev-map defaultval)
       (define (build-shape name num)
         (cond [(= num 0) name]
               [(= num 1) (list name (list 'prev name))]
               [else (cons name (map (lambda (x) (list 'prev x)) (build-shape name (- num 1))))]))
       (define (build-input-inst inputs-prev)
         (match inputs-prev
-          [(list name num) (input-inst name num (build-shape name num))]))
+          [(list name num)
+           (let ([val (assoc name defaultval)])
+             (if val
+                 (input-init-inst name num (cadr val) (build-shape name num))
+                 (input-inst name num (build-shape name num))))]))
       (map (lambda (x) (build-input-inst x)) inputs-prev-map))
   
     (match spec-input
-      [(spec inputs _ _ _ body)
-       (prev-map-to-inputs-map (collect-prev inputs (analyze-prev-new-stream body)))]))
+      [(spec inputs _ _ _ defaultval body)
+       (prev-map-to-inputs-map (collect-prev inputs (analyze-prev-new-stream body)) defaultval)]))
   (match spec-input
-    [(spec inputs output funclist constantlist body)
+    [(spec inputs output funclist constantlist _ body)
      (let ([input-map (get-inputs-map spec-input)])
        (translate-body input-map output funclist constantlist body))]))
 

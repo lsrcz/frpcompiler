@@ -25,9 +25,19 @@
                            (format "~a = input(~a, ~a) :: ~a"
                                    (if (= num 0)
                                        name
-                                       (format "~a~a" name num))  name num shape)])
+                                       (format "~a~a" name num))  name num shape)]
+                          [(input-init-inst name num init shape)
+                           (format "~a = input-init(~a, ~a, ~a) :: ~a"
+                                   (if (= num 0)
+                                       name
+                                       (format "~a~a" name num))
+                                   name
+                                   num
+                                   init
+                                   shape)])
                         "\n" (iter nxt))]))
-    (let ([to-format (filter (match-lambda [(input-inst _ num _) (not (= num 0))]) inputs)])
+    (let ([to-format (filter (match-lambda [(input-inst _ num _) (not (= num 0))]
+                                           [(input-init-inst _ num _ _) (not (= num 0))]) inputs)])
       (iter to-format)))
       
   (define (format-inst-imperative ident imperative-inst)

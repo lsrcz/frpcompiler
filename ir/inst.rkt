@@ -3,6 +3,7 @@
 (provide (all-defined-out))
 
 (struct input-inst (name num shape) #:transparent)
+(struct input-init-inst (name num init shape) #:transparent)
 (struct intro-inst (intro-lst ref shape) #:transparent)
 (struct intro-const-inst (intro-lst ref shape) #:transparent)
 (struct compute-inst (to-compute name ref shape) #:transparent)
@@ -29,6 +30,7 @@
 (define (get-shape inst)
   (match inst
     [(input-inst _ _ shape) shape]
+    [(input-init-inst _ _ _ shape) shape]
     [(intro-inst _ _ shape) shape]
     [(compute-inst _ _ _ shape) shape]
     [(filter-inst _ _ shape) shape]

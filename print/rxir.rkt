@@ -176,7 +176,7 @@
                 (format-symbol start-val)
                 (get-ident ident)))
       (define (format-rx-start-with val)
-        (format "startWith(~a)" val))
+        (format "startWith(~a)" (format-symbol val)))
       (define (format-imperative inst ident)
         (define ident-str (get-ident ident))
         (define identp2 (+ ident 2))

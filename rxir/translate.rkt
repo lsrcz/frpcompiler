@@ -18,12 +18,26 @@
              (for/list ([a (range num)])
                (rx-start-with-undefined))
              (list (rx-buffer-count (+ 1 num) 1)))))]))
+
+  (define (emit-input-init ir)
+    (match ir
+      [(input-init-inst name num init shape)
+       (if (= num 0)
+           (rx-name-ref name)
+           (rx-pipe
+            (rx-name-ref name)
+            (append
+             (for/list ([a (range num)])
+               (rx-start-with init))
+             (list (rx-buffer-count (+ 1 num) 1)))))]))
   
   (define input-list (match ir-list-input
                        [(ir-list input-list _ _) input-list]))
-  (define rxir-input-mapping (map (lambda (x) (cons x (emit-input x))) input-list))
+  (define rxir-input-mapping (map (lambda (x) (cons x ((if (input-inst? x) emit-input emit-input-init) x))) input-list))
   (define rxir-input-inst-list
     (map (match-lambda [(cons (input-inst name num _) rxir)
+                        (rxir-input-inst name num rxir)]
+                       [(cons (input-init-inst name num _ _) rxir)
                         (rxir-input-inst name num rxir)])
          rxir-input-mapping))
   
@@ -190,6 +204,7 @@
            (list 'if-else arg (emit-imperative then-branch) (emit-imperative else-branch))]
           [(ir-list _ _ _) (emit-rxir-inner (ir-list-lst inst))]))
       ((cond [(input-inst? ir) emit-input]
+             [(input-init-inst? ir) emit-input-init]
              [(intro-inst? ir) emit-intro]
              [(intro-const-inst? ir) emit-intro-const]
              [(compute-inst? ir) emit-compute]
