@@ -92,6 +92,7 @@
           '(split n yc)
           '(new-stream sc)
           '(new-stream-initial sc n)
+          '(empty-stream)
           '(let n n)
           '(new-stream-seed sc n)))
   (define (map-body-args body)

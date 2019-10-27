@@ -2,44 +2,51 @@
 
 (require "../test/test-spec.rkt")
 (require "spec.rkt")
+(require "syntax.rkt")
 (require rackunit)
 
 (provide check-spec)
 
 (define (check-begin-let body)
-  (define (check-begin-let-begin last-func lst)
+  (define (begin-visitor . lst)
     (let ([cur (car lst)]
           [rest (cdr lst)])
       (if (null? rest)
-          (and (not (eq? (car cur) 'let))
-               (last-func cur))
-          (and (eq? (car cur) 'let)
-               (check-begin-let-begin last-func rest)))))
-  (define (check-begin-let-imperative inst)
-    (match inst
-      [(list 'if _ branch) (check-begin-let-imperative branch)]
-      [(list 'if-else _ then-branch else-branch)
-       (and (check-begin-let-imperative then-branch)
-            (check-begin-let-imperative else-branch))]
-      [(cons 'begin lst) (check-begin-let-begin check-begin-let-imperative lst)]
-      [(list 'empty-stream) #t]
-      [(list 'new-stream body) (check-begin-let body)]
-      [(list 'new-stream-initial body _) (check-begin-let body)]
-      [(list 'new-stream-seed body _) (check-begin-let body)]))
-  (define (check-begin-let-one inst)
-    (match inst
-      [(list 'if _ branch) (check-begin-let-one branch)]
-      [(list 'if-else _ then-branch else-branch)
-       (and (check-begin-let-one then-branch)
-            (check-begin-let-one else-branch))]
-      [(list 'bind _ _ inst) (check-begin-let-one inst)]
-      [(list 'return _) #t]
-      [(list 'split _ body) (check-begin-let-imperative body)]
-      [(list 'custom _ inst) (check-begin-let-one inst)]
-      [(cons 'begin lst) (check-begin-let-begin check-begin-let-one lst)]))
+          (and (not (pair? cur))
+               cur)
+          (and (pair? cur)
+               (eq? (car cur) 'let)
+               (apply begin-visitor rest)))))
+  (define (collect-new-stream l)
+    (if (null? l)
+        #t
+        (and (cadar l) (collect-new-stream (cdr l)))))
+  (define descend-list
+    (list
+      (cons 'if (lambda (_ branch) branch))
+      (cons 'if-else (lambda (_ then-branch else-branch) (and then-branch else-branch)))
+      (cons 'begin begin-visitor)
+      (cons 'empty-stream (lambda () #t))
+      (cons 'new-stream collect-new-stream)
+      (cons 'new-stream-initial (lambda (lst _) (collect-new-stream lst)))
+      (cons 'new-stream-seed (lambda (lst _) (collect-new-stream lst)))
+      (cons 'bind (lambda (_ _1 body) body))
+      (cons 'return (lambda (_) #t))
+      (cons 'split (lambda (_ body) body))
+      (cons 'custom (lambda (_ body) body))
+    ))
+  (define check-visitor
+    (visitor
+     descend-list
+     '()
+     descend-list
+     '()))
   (if (null? body)
       #t
-      (and (check-begin-let-one (cadar body)) (check-begin-let (cdr body)))))
+      (let* ([cur (car body)]
+             [rest (cdr body)]
+             [cur-body (cadr cur)])
+        (and (visit check-visitor cur-body #f) (check-begin-let rest)))))
 
 (define (check-unique-split body)
   (define (check-unique-split-inner outter body)
@@ -89,7 +96,7 @@
 
 (define (check-spec spec-input)
   (match spec-input
-    [(spec _ _ _ _ body) (check-spec-body body)]))
+    [(spec _ _ _ _ _ body) (check-spec-body body)]))
 
 (define (main)
   (check-equal? (check-begin-let
@@ -127,4 +134,4 @@
   (check-equal? (check-spec-body
                  '((a (if-else a (split (()) (empty-stream)) (return a))))) #f)
   )
-
+(main)
