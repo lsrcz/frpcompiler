@@ -2,6 +2,7 @@
 
 (require "environment.rkt")
 (require "../../ast/spec.rkt")
+(require "../../test/trace.rkt")
 (require "analyzed.rkt")
 (require "../subscribe-fsm.rkt")
 (require "../../ast/syntax.rkt")

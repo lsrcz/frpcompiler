@@ -1,7 +1,8 @@
 #lang rosette/safe
 
 ;(require rackunit)
-(require "analyzed.rkt")
+(require "analyzed.rkt"
+         "../../test/trace.rkt")
 (require rosette/lib/match)
 
 (provide (all-defined-out))
@@ -19,11 +20,6 @@
 (struct resolved (value) #:transparent)
 (struct not-found () #:transparent)
 (struct too-early () #:transparent)
-
-
-(struct event (name value) #:transparent)
-(struct empty-event () #:transparent)
-(struct trace (event-lst) #:transparent)
 
 (define (get-event-by-time trace time)
   (list-ref (trace-event-lst trace) time))

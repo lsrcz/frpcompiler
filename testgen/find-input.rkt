@@ -1,6 +1,6 @@
 #lang rosette/safe
 
-(require "sym-trace.rkt"
+(require "../test/trace.rkt"
          "../interpret/interpret-spec/analyzed.rkt"
          "../interpret/interpret-spec/environment.rkt"
          "../interpret/interpret-spec/spec.rkt")

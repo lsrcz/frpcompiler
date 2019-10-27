@@ -1,10 +1,13 @@
-#lang rosette
+#lang rosette/safe
 
-(require "../interpret/interpret-spec/environment.rkt"
-         rosette/lib/match
+(require rosette/lib/match
          rosette/lib/angelic)
 
 (provide (all-defined-out))
+
+(struct event (name value) #:transparent)
+(struct empty-event () #:transparent)
+(struct trace (event-lst) #:transparent)
 
 (define (get-single-symbolic-event name constructor)
   (event name (constructor)))
@@ -19,8 +22,11 @@
            (choose* (get-single-symbolic-event name constructor) (get-symbolic-event rest))]))))
 
 (define (get-symbolic-event-list constructor-mapping length)
-  (for/list ([i length])
-    (get-symbolic-event constructor-mapping)))
+  (define (iter length)
+    (if (= 0 length)
+        '()
+        (cons (get-symbolic-event constructor-mapping) (iter (- length 1)))))
+  (iter length))
 
 (define (get-symbolic-trace constructor-mapping length)
   (trace (get-symbolic-event-list constructor-mapping length)))
@@ -32,9 +38,7 @@
   (define-symbolic* b boolean?)
   b)
 
-
 (define (main)
-  (error-print-width 10000000)
   (define mapping
     (list
      (cons 'a integer-constructor)

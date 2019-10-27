@@ -273,8 +273,8 @@
 
 (define (mutate-spec spec-input prev-depth)
   (match spec-input
-    [(spec inputs output funclist const-list body)
-     (map (lambda (x) (spec inputs output funclist const-list x)) (mutate-body body const-list inputs prev-depth))]))
+    [(spec inputs output funclist const-list defaultval body)
+     (map (lambda (x) (spec inputs output funclist const-list defaultval x)) (mutate-body body const-list inputs prev-depth))]))
            
 
 (define (main-mut-gen)
