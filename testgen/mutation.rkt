@@ -60,19 +60,19 @@
              (format-specs timeouted)
              (format-specs not-well-formed))]))
 
-(define (find-distinguish-input spec1 spec2 bindings sym-trace)
+(define (find-distinguish-input interpreter spec1 spec2 sym-trace)
   #|(define e (engine (lambda (_)|#
                       (synthesize
                        #:forall (list)
                        #:guarantee
                        (assert (not
-                                (equal? (interpret-spec spec1 sym-trace bindings)
-                                        (interpret-spec spec2 sym-trace bindings))))))#|))
+                                (equal? (interpreter spec1 sym-trace)
+                                        (interpreter spec2 sym-trace))))))#|))
   (if (engine-run 100000 e)
       (engine-result e)
       'timeout))|#
 
-(define (check-semantics spec-input sym-trace binding-input)
+(define (check-semantics interpreter spec-input sym-trace)
   #|(define e
     (engine
      (lambda (_)|#
@@ -80,7 +80,7 @@
        (displayln spec-input)
        (let ([val (sat? (time
               (synthesize #:forall (symbolics sym-trace)
-                          #:guarantee (assert (interpret-spec spec-input sym-trace binding-input)))))])
+                          #:guarantee (assert (interpreter spec-input sym-trace)))))])
 
          (displayln val)
          val))#|))
@@ -88,12 +88,12 @@
       (engine-result e)
       #f))|#
 
-(define (gen-test-on-mutants spec mutants bindings constructor-list start-len max-len step)
+(define (gen-test-on-mutants spec mutants interpreter constructor-list start-len max-len step)
   (define (gen-test-on-mutant mutant cur-len)
     (displayln mutant)
     ;semantics should already be checked
     (let* ([sym-trace (get-symbolic-trace constructor-list cur-len)]
-           [model (find-distinguish-input spec mutant bindings sym-trace)])
+           [model (find-distinguish-input interpreter spec mutant sym-trace)])
       (if (eq? model 'timeout)
           'timeout
           (if (unsat? model)
@@ -102,11 +102,10 @@
                     'survived
                     (gen-test-on-mutant mutant new-len)))
               (let* ([trace (evaluate sym-trace (complete-solution model (symbolics sym-trace)))]
-                     [output (interpret-spec spec trace bindings)])
+                     [output (interpreter spec trace)])
                 (rx-test-case trace output))))))
   (define max-trace (get-symbolic-trace constructor-list max-len))
-  (define trace-5 (get-symbolic-trace constructor-list 5))
-  (define-values (well-formed not-well-formed) (partition (lambda (x) (check-semantics x trace-5 bindings)) mutants))
+  (define-values (well-formed not-well-formed) (partition (lambda (x) (check-semantics interpreter x max-trace)) mutants))
   (define (add-killeds killeds result)
     (match killeds
       [(list) result]
@@ -121,22 +120,22 @@
          (cond [(eq? 'survived result) (add-survived (iter rest) mutant)]
                [(eq? 'timeout result) (add-timeouted (iter rest) mutant)]
                [else
-                (let ([killeds (filter (lambda (mutant) (failing-test? (run-case mutant bindings result))) mutants)]
-                      [surviveds (filter (lambda (mutant) (success-test? (run-case mutant bindings result))) mutants)])
+                (let ([killeds (filter (lambda (mutant) (failing-test? (run-case interpreter mutant result))) mutants)]
+                      [surviveds (filter (lambda (mutant) (success-test? (run-case interpreter mutant result))) mutants)])
                   (add-test (add-killeds killeds (iter surviveds)) result))]))]))
   (iter well-formed))
 
 (define (main)
   (define (test-case1)
     (define spec1-input
-      (spec '(a b) 'd '(add1 + - not >) '(t x)
+      (spec '(a b) 'd '(add1 + - not >) '(t x) '()
             '((a (split ((a1 (add1 a)))
                         (if (> a1 t)
                             (new-stream ((b (if-else (undefined? d)
                                                      (return (add1 (+ a1 b)))
                                                      (return (+ b d))))))))))))
     (define spec2-input
-      (spec '(a b) 'd '(add1 + - not >) '(t x)
+      (spec '(a b) 'd '(add1 + - not >) '(t x) '()
             '((a (split ((a1 (add1 a)))
                         (if (> a1 t)
                             (new-stream ((b (if (undefined? d)
@@ -144,7 +143,7 @@
                                                 ))))))))))
 
     (define spec3-input
-      (spec '(a b) 'd '(add1 + - not >) '(t x)
+      (spec '(a b) 'd '(add1 + - not >) '(t x) '()
             '((a (split ((a1 (add1 a)))
                         (if (> a1 t)
                             (new-stream ((b (return (+ b d)))))))))))
@@ -159,6 +158,7 @@
                            (binding 't 1)
                            (binding 'x 1)
                            (binding 'undefined 'undefined)))
+    (define (interpreter spec-input trace) (interpret-spec spec-input trace binding-input))
 
     (define constructor-list (list (cons 'a integer-constructor)
                                    (cons 'b integer-constructor)))
@@ -167,35 +167,32 @@
                        constructor-list
                        5))
 
-    (define m (find-distinguish-input spec1-input spec2-input
-                                      binding-input sym-trace ))
+    (define m (find-distinguish-input interpreter spec1-input spec2-input sym-trace))
     (define solved-trace (evaluate sym-trace m))
     (displayln solved-trace)
-    (displayln (interpret-spec spec1-input solved-trace binding-input))
-    (displayln (interpret-spec spec2-input solved-trace binding-input))
+    (displayln (interpreter spec1-input solved-trace))
+    (displayln (interpreter spec2-input solved-trace))
 
      
     (define m1 (synthesize #:forall (symbolics sym-trace)
-                           #:guarantee (assert (interpret-spec spec2-input sym-trace binding-input))))
-    (check-equal? (check-semantics spec1-input sym-trace binding-input) #t)
-    (check-equal? (check-semantics spec2-input sym-trace binding-input) #t)
-    (check-equal? (check-semantics spec3-input sym-trace binding-input) #f)
-     
-     
+                           #:guarantee (assert (interpreter spec2-input sym-trace))))
+    (check-equal? (check-semantics interpreter spec1-input sym-trace) #t)
+    (check-equal? (check-semantics interpreter spec2-input sym-trace) #t)
+    (check-equal? (check-semantics interpreter spec3-input sym-trace) #f)
     )
-  ;(test-case1)
+
 
 
   (define (test-case2)
     (define spec1-input
-      (spec '(a b) 'd '(add1 + - not >) '(t x)
+      (spec '(a b) 'd '(add1 + - not >) '(t x) '()
             '((a (split ((a1 (add1 a)))
                         (if (> a1 t)
                             (new-stream ((b (if-else (undefined? d)
                                                      (return (add1 (+ a1 b)))
                                                      (return (+ b d))))))))))))
     (define spec2-input
-      (spec '(a b) 'd '(add1 + - not >) '(t x)
+      (spec '(a b) 'd '(add1 + - not >) '(t x) '()
             '((a (split ((a1 (add1 a)))
                         (if (> a1 t)
                             (new-stream ((b (if (undefined? d)
@@ -203,7 +200,7 @@
                                                 ))))))))))
 
     (define spec3-input
-      (spec '(a b) 'd '(add1 + - not >) '(t x)
+      (spec '(a b) 'd '(add1 + - not >) '(t x) '()
             '((a (split ((a1 (add1 a)))
                         (if (> a1 t)
                             (new-stream ((b (return (+ b d)))))))))))
@@ -219,10 +216,12 @@
                            (binding 'x 1)
                            (binding 'undefined 'undefined)))
 
+    (define (interpreter spec-input trace) (interpret-spec spec-input trace binding-input))
+
     (define constructor-list (list (cons 'a integer-constructor)
                                    (cons 'b integer-constructor)))
 
-    (define result (time (format-result (gen-test-on-mutants spec1-input (list spec2-input spec3-input) binding-input constructor-list 5 20 5))))
+    (define result (time (format-result (gen-test-on-mutants spec1-input (list spec2-input spec3-input) interpreter constructor-list 1 5 1))))
 
     (displayln result)
      
@@ -232,7 +231,7 @@
   
   (define (test-case3)
     (define spec1-input
-      (spec '(a b) 'd '(add1 + - not >) '(t x)
+      (spec '(a b) 'd '(add1 + - not >) '(t x) '()
             '((a (split ((a1 (add1 a)))
                         (if (> a1 t)
                             (new-stream ((b (if-else (undefined? d)
@@ -252,11 +251,13 @@
                            (binding 'x 1)
                            (binding 'undefined 'undefined)))
 
+    (define (interpreter spec-input trace) (interpret-spec spec-input trace binding-input))
+
     (define constructor-list (list (cons 'a integer-constructor)
                                    (cons 'b integer-constructor)))
 
 
-    (define result (time (format-result (gen-test-on-mutants spec1-input mutants binding-input constructor-list 5 20 5))))
+    (define result (time (format-result (gen-test-on-mutants spec1-input mutants interpreter constructor-list 1 5 1))))
 
     (displayln result)
      
@@ -301,6 +302,7 @@
                            (binding 'list list)
                            (binding 'segment segment)
                            (binding 'append-one (lambda (lst x) (append lst (list x))))))
+    (define (interpreter spec trace) (interpret-spec spec trace binding-input))
 
     (define constructor-list (list (cons 'mode mode-constructor)
                                    (cons 'down point-constructor)
@@ -319,15 +321,16 @@
         (event 'move (point 2 3))
         (event 'move (point 3 4)))))
 
-    (displayln (check-semantics drawing-split-spec (get-symbolic-trace constructor-list 5) binding-input))
+    (displayln (check-semantics interpreter drawing-split-spec (get-symbolic-trace constructor-list 5)))
 
-    (displayln (interpret-spec drawing-split-spec concrete-trace1 binding-input))
+    (displayln (interpreter drawing-split-spec concrete-trace1))
 
-    (define result (time (format-result (gen-test-on-mutants drawing-split-spec mutants binding-input constructor-list 5 20 5))))
+    (define result (time (format-result (gen-test-on-mutants drawing-split-spec mutants interpreter constructor-list 1 5 1))))
 
     (displayln result)
      
     )
-  (test-case4)
+  ;(test-case4)
+    (test-case4)
   )
 (main)
