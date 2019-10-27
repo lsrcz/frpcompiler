@@ -75,3 +75,61 @@
 (define (new-stream-seed? body) (eq? (get-op body) 'new-stream-seed))
 (define (empty-stream? body) (eq? (get-op body) 'empty-stream))
 (define (return-empty? body) (eq? (get-op body) 'return-empty))
+
+
+(struct visitor (descend-list stopping-list descend-list-imp stopping-list-imp) #:transparent)
+(define (visit visitor-input body imp)
+  ; begin excluded
+  (define descend-spec
+    (list '(if n y)
+          '(if-else n y y)
+          '(if-multi n y n)
+          '(if-else-multi n y y n)
+          '(case-multi n m n)
+          '(return n)
+          '(bind n n y)
+          '(custom n y)
+          '(split n yc)
+          '(new-stream sc)
+          '(new-stream-initial sc n)
+          '(let n n)
+          '(new-stream-seed sc n)))
+  (define (map-body-args body)
+    (define (map-begin-args args)
+      (map (lambda (x) (visit visitor-input x imp)) args))
+    (define (map-args sp args)
+      (if (null? sp)
+          '()
+          (cons
+           (cond [(eq? 'n (car sp))
+                  (car args)]
+                 [(eq? 'y (car sp))
+                  (visit visitor-input (car args) imp)]
+                 [(eq? 'yc (car sp))
+                  (visit visitor-input (car args) (not imp))]
+                 [(eq? 'm (car sp))
+                  (map (lambda (x) (visit visitor-input x imp)) (car args))]
+                 [(eq? 'mc (car sp))
+                  (map (lambda (x) (visit visitor-input x (not imp))) (car args))]
+                 [(eq? 'sc (car sp))
+                  (map (lambda (x) (list (car x) (visit visitor-input (cadr x) (not imp)))) (car args))])
+           (map-args (cdr sp) (cdr args)))))
+    (if (begin? body)
+        (map-begin-args (cdr body))
+        (let ([sp (assoc (car body) descend-spec)])
+          (map-args (cdr sp) (cdr body)))))
+  (let ([descend-list
+         ((if imp
+              visitor-descend-list-imp
+              visitor-descend-list)
+          visitor-input)]
+        [stopping-list
+         ((if imp
+              visitor-stopping-list-imp
+              visitor-stopping-list)
+          visitor-input)])
+    (let* ([d (assoc (car body) descend-list)]
+           [s (assoc (car body) stopping-list)])
+      (cond [d (apply (cdr d) (map-body-args body))]
+            [s (apply (cdr s) (cdr body))]
+            [else body]))))
