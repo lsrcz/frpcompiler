@@ -6,66 +6,37 @@
 (provide monad-desugar monad-desugar-spec)
 
 (define (monad-desugar spec)
-  (define (desugar-body body)
-    (cond [(if? body)
-           (desugar-if body)]
-          [(if-else? body)
-           (desugar-if-else body)]
-          [(begin? body)
-           (desugar-begin body)]
-          [(let? body)
-           (error "should not happen")]
-          [(custom? body)
-           (desugar-custom body)]
-          [(split? body)
-           (desugar-split body)]
-          [(new-stream? body)
-           (desugar-new-stream body)]
-          [(new-stream-initial? body)
-           (desugar-new-stream-initial body)]
-          [(new-stream-seed? body)
-           (desugar-new-stream-seed body)]
-          [else body]))
-  (define (desugar-if body)
-    (let ([arg (if-arg body)]
-          [desugared-branch (desugar-body (if-branch body))])
-      (build-if arg desugared-branch)))
-  (define (desugar-if-else body)
-    (let ([arg (if-else-arg body)]
-          [desugared-then (desugar-body (if-else-then-branch body))]
-          [desugared-else (desugar-body (if-else-else-branch body))])
-      (build-if-else arg desugared-then desugared-else)))
-  (define (desugar-begin body)
+  (define (begin-visitor . seq)
     (define (desugar-seq body)
       (if (null? (cdr body))
           (if (let? (car body))
               (error "wrong format")
-              (desugar-body (car body)))
+              (car body))
           (if (let? (car body))
               (let ([let-stmt (car body)])
                 (build-bind (let-name let-stmt) (let-body let-stmt) (desugar-seq (cdr body))))
               (error "wrong format"))))
-    (desugar-seq (begin-seq body)))
-  (define (desugar-split body)
-    (let ([bindings (split-bindings body)]
-          [desugared-body (desugar-body (split-body body))])
-      (build-split bindings desugared-body)))
-  (define (desugar-new-stream body)
-    (let ([desugared-body (map monad-desugar (new-stream-body body))])
-      (build-new-stream desugared-body)))
-  (define (desugar-new-stream-initial body)
-    (let ([desugared-body (map monad-desugar (new-stream-initial-body body))])
-      (build-new-stream-initial desugared-body (new-stream-initial-initial body))))
-  (define (desugar-new-stream-seed body)
-    (let ([desugared-body (map monad-desugar (new-stream-seed-body body))])
-      (build-new-stream-seed desugared-body (new-stream-seed-seed body))))
-  (define (desugar-custom body)
-    (let ([name (custom-name body)]
-          [desugared-inst (desugar-body (custom-body body))])
-      (build-custom name desugared-inst)))
+    (desugar-seq seq))
+  (define descend-list
+    (list
+     (cons 'if build-if)
+     (cons 'if-else build-if-else)
+     (cons 'bind build-bind)
+     (cons 'custom build-custom)
+     (cons 'split build-split)
+     (cons 'new-stream build-new-stream)
+     (cons 'new-stream-initial build-new-stream-initial)
+     (cons 'new-stream-seed build-new-stream-seed)
+     (cons 'begin begin-visitor)))
+  (define desugar-visitor
+    (visitor
+     descend-list
+     '()
+     descend-list
+     '()))
   (let ([name (car spec)]
         [body (cadr spec)])
-    (list name (desugar-body body))))
+    (list name (visit desugar-visitor body #f))))
 
 (define (monad-desugar-spec spec-input)
   (match spec-input
@@ -132,6 +103,7 @@
   (println (monad-desugar-spec drawing-spec))
   )
 
+(main)
 
               
           
