@@ -58,16 +58,23 @@
 
 (define (mutate-inst inst symbol-list const-list inputs prev-depth)
   ((cond [(if? inst) mutate-if]
+         [(if-multi? inst) mutate-if-multi]
+         [(if-else-multi? inst) mutate-if-else-multi]
+         [(case-multi? inst) mutate-case-multi]
          [(return? inst) mutate-return]
          [(if-else? inst) mutate-if-else]
          [(bind? inst) mutate-bind]
          [(begin? inst) mutate-begin]
          [(split? inst) mutate-split]
+         [(return-empty? inst) (lambda lst '())]
          [else 'not-implemented]) inst symbol-list const-list inputs prev-depth))
 
 (define (mutate-inst-imp inst const-list inputs prev-depth)
   ((cond [(if? inst) mutate-if-imp]
          [(if-else? inst) mutate-if-else-imp]
+         [(if-multi? inst) mutate-if-multi-imp]
+         [(if-else-multi? inst) mutate-if-else-multi-imp]
+         [(case-multi? inst) mutate-case-multi-imp]
          [(bind? inst) mutate-bind-imp]
          [(empty-stream? inst) mutate-empty-stream]
          [(new-stream? inst) mutate-new-stream]
@@ -128,37 +135,110 @@
              (map (lambda (x) (list 'split bindings x)) (mutate-inst-imp body (append (map car bindings) const-list) inputs prev-depth)))]))
 
 
-(define (mutate-if inst symbol-list const-list inputs prev-depth)
+(define (mutate-if inst symbol-list const-list inputs prev-depth [imp #f])
   (match inst
     [(list 'if js-expr branch)
      (define mutate-if-arg
-       (map (lambda (x) (list 'if x branch)) (mutate-js-expr js-expr symbol-list inputs prev-depth)))
+       (map (lambda (x) (list 'if x branch)) (mutate-js-expr js-expr (if imp const-list symbol-list) inputs prev-depth)))
      (define remove-if (list branch))
      (define flip-if (list (list 'if (list 'not js-expr) branch)))
-     (define mutate-branch (map (lambda (x) (list 'if js-expr x)) (mutate-inst branch symbol-list const-list inputs prev-depth)))
+     (define mutate-branch (map (lambda (x) (list 'if js-expr x))
+                                (if imp
+                                    (mutate-inst-imp branch const-list inputs prev-depth)
+                                    (mutate-inst branch symbol-list const-list inputs prev-depth))))
      (append mutate-if-arg
              remove-if
              flip-if
              mutate-branch)]))
 
 (define (mutate-if-imp inst const-list inputs prev-depth)
-  (match inst
-    [(list 'if js-expr branch)
-     (define mutate-if-arg
-       (map (lambda (x) (list 'if x branch)) (mutate-js-expr js-expr const-list inputs prev-depth)))
-     (define remove-if (list branch))
-     (define flip-if (list (list 'if (list 'not js-expr) branch)))
-     (define mutate-branch (map (lambda (x) (list 'if js-expr x)) (mutate-inst-imp branch const-list inputs prev-depth)))
-     (append mutate-if-arg
-             remove-if
-             flip-if
-             mutate-branch)]))
+  (mutate-if inst '() const-list inputs prev-depth #t))
 
-(define (mutate-if-else inst symbol-list const-list inputs prev-depth)
+(define (mutate-if-multi inst symbol-list const-list inputs prev-depth [imp #f])
+  ; remove & flip are handled by mutating the mapping
+  (define js-list (if imp const-list symbol-list))
+  (match inst
+    [(list 'if-multi args branch mapping)
+       (define (iter args)
+         (match args
+           [(list) 'should-not-happen]
+           [(list js-expr) (mutate-js-expr js-expr js-list inputs prev-depth)]
+           [(cons js-expr rest)
+            (append (map (lambda (x) (cons x rest)) (mutate-js-expr js-expr js-list inputs prev-depth))
+                    (map (lambda (x) (cons js-expr x)) (iter rest)))]))
+       (define mutate-if-args
+         (map (lambda (x) (list 'if-multi x branch mapping)) (iter args)))
+     (define mutate-branch (map (lambda (x) (list 'if-multi args x mapping))
+                                (if imp
+                                    (mutate-inst-imp branch const-list inputs prev-depth)
+                                    (mutate-inst branch symbol-list const-list inputs prev-depth))))
+     (append mutate-if-args mutate-branch)]))
+
+(define (mutate-if-multi-imp inst const-list inputs prev-depth)
+  (mutate-if-multi inst '() const-list inputs prev-depth #t))
+
+(define (mutate-if-else-multi inst symbol-list const-list inputs prev-depth [imp #f])
+  ; remove & flip are handled by mutating the mapping
+  (define js-list (if imp const-list symbol-list))
+  (match inst
+    [(list 'if-else-multi args then-branch else-branch mapping)
+     (define (iter args)
+       (match args
+         [(list) 'should-not-happen]
+         [(list js-expr) (mutate-js-expr js-expr js-list inputs prev-depth)]
+         [(cons js-expr rest)
+          (append (map (lambda (x) (cons x rest)) (mutate-js-expr js-expr js-list inputs prev-depth))
+                  (map (lambda (x) (cons js-expr x)) (iter rest)))]))
+     (define mutate-if-else-args
+       (map (lambda (x) (list 'if-else-multi x then-branch else-branch mapping)) (iter args)))
+     (define mutate-then-branch (map (lambda (x) (list 'if-else-multi args x else-branch mapping))
+                                (if imp
+                                    (mutate-inst-imp then-branch const-list inputs prev-depth)
+                                    (mutate-inst else-branch symbol-list const-list inputs prev-depth))))
+     (define mutate-else-branch (map (lambda (x) (list 'if-else-multi args then-branch x mapping))
+                                (if imp
+                                    (mutate-inst-imp else-branch const-list inputs prev-depth)
+                                    (mutate-inst else-branch symbol-list const-list inputs prev-depth))))
+     (append mutate-if-else-args mutate-then-branch mutate-else-branch)]))
+
+(define (mutate-if-else-multi-imp inst const-list inputs prev-depth)
+  (mutate-if-else-multi inst '() const-list inputs prev-depth #t))
+
+(define (mutate-case-multi inst symbol-list const-list inputs prev-depth [imp #f])
+  (define js-list (if imp const-list symbol-list))
+  (define (mutate-func inst)
+    (if imp
+        (mutate-inst-imp inst const-list inputs prev-depth)
+        (mutate-inst inst symbol-list const-list inputs prev-depth)))
+  (match inst
+    [(list 'case-multi args branchs mapping)
+     (define (iter args)
+       (match args
+         [(list) 'should-not-happen]
+         [(list js-expr) (mutate-js-expr js-expr js-list inputs prev-depth)]
+         [(cons js-expr rest)
+          (append (map (lambda (x) (cons x rest)) (mutate-js-expr js-expr js-list inputs prev-depth))
+                  (map (lambda (x) (cons js-expr x)) (iter rest)))]))
+     (define mutate-case-args
+       (map (lambda (x) (list 'case-multi x branchs mapping)) (iter args)))
+     (define (iter-branchs branchs)
+       (match branchs
+         [(list) 'should-not-happen]
+         [(list branch) (mutate-func branch)]
+         [(cons branch rest)
+          (append (map (lambda (x) (cons x rest)) (mutate-func branch))
+                  (map (lambda (x) (cons branch x)) (iter-branchs rest)))]))
+     (define mutate-branchs (map (lambda (x) (list 'case-multi args x mapping)) (iter-branchs branchs)))
+     (append mutate-case-args mutate-branchs)]))
+
+(define (mutate-case-multi-imp inst const-list inputs prev-depth)
+  (mutate-case-multi inst '() const-list inputs prev-depth #t))
+
+(define (mutate-if-else inst symbol-list const-list inputs prev-depth [imp #f])
   (match inst
     [(list 'if-else js-expr then-branch else-branch)
      (define mutate-if-else-arg
-       (map (lambda (x) (list 'if x then-branch else-branch)) (mutate-js-expr js-expr symbol-list inputs prev-depth)))
+       (map (lambda (x) (list 'if x then-branch else-branch)) (mutate-js-expr js-expr (if imp const-list symbol-list) inputs prev-depth)))
      (define remove-if-else (list then-branch else-branch))
      (define flip-if-else (list (list 'if-else js-expr else-branch then-branch)))
      (define delete-branch
@@ -168,9 +248,13 @@
         (list 'if (list 'not js-expr) then-branch)
         (list 'if (list 'not js-expr) else-branch)))
      (define mutate-then (map (lambda (x) (list 'if-else js-expr x else-branch))
-                              (mutate-inst then-branch symbol-list const-list inputs prev-depth)))
+                              (if imp
+                                  (mutate-inst-imp then-branch const-list inputs prev-depth)
+                                  (mutate-inst then-branch symbol-list const-list inputs prev-depth))))
      (define mutate-else (map (lambda (x) (list 'if-else js-expr then-branch x))
-                              (mutate-inst else-branch symbol-list const-list inputs prev-depth)))
+                              (if imp
+                                  (mutate-inst-imp else-branch const-list inputs prev-depth)
+                                  (mutate-inst else-branch symbol-list const-list inputs prev-depth))))
      (append mutate-if-else-arg
              remove-if-else
              flip-if-else
@@ -179,48 +263,23 @@
              mutate-else)]))
 
 (define (mutate-if-else-imp inst const-list inputs prev-depth)
-  (match inst
-    [(list 'if-else js-expr then-branch else-branch)
-     (define mutate-if-else-arg
-       (map (lambda (x) (list 'if x then-branch else-branch)) (mutate-js-expr js-expr const-list inputs prev-depth)))
-     (define remove-if-else (list then-branch else-branch))
-     (define flip-if-else (list (list 'if-else js-expr else-branch then-branch)))
-     (define delete-branch
-       (list
-        (list 'if js-expr then-branch)
-        (list 'if js-expr else-branch)
-        (list 'if (list 'not js-expr) then-branch)
-        (list 'if (list 'not js-expr) else-branch)))
-     (define mutate-then (map (lambda (x) (list 'if-else js-expr x else-branch))
-                              (mutate-inst-imp then-branch const-list inputs prev-depth)))
-     (define mutate-else (map (lambda (x) (list 'if-else js-expr then-branch x))
-                              (mutate-inst-imp else-branch const-list inputs prev-depth)))
-     (append mutate-if-else-arg
-             remove-if-else
-             flip-if-else
-             delete-branch
-             mutate-then
-             mutate-else)]))
+  (mutate-if-else inst '() const-list inputs prev-depth #t))
 
-(define (mutate-bind inst symbol-list const-list inputs prev-depth)
+(define (mutate-bind inst symbol-list const-list inputs prev-depth [imp #f])
   (match inst
     [(list 'bind name js-expr next)
      (define mutate-bind-arg
-       (map (lambda (x) (list 'bind name x next) (mutate-js-expr js-expr symbol-list inputs prev-depth))))
+       (map (lambda (x) (list 'bind name x next) (mutate-js-expr js-expr (if imp const-list symbol-list) inputs prev-depth))))
      (define mutate-next
-       (map (lambda (x) (list 'bind name js-expr x) (mutate-inst next (cons name symbol-list) const-list inputs prev-depth))))
+       (map (lambda (x) (list 'bind name js-expr x)
+              (if imp
+                  (mutate-inst-imp next (cons name const-list) inputs prev-depth)
+                  (mutate-inst next (cons name symbol-list) const-list inputs prev-depth)))))
      (append mutate-bind-arg
              mutate-next)]))
 
 (define (mutate-bind-imp inst const-list inputs prev-depth)
-  (match inst
-    [(list 'bind name js-expr next)
-     (define mutate-bind-arg
-       (map (lambda (x) (list 'bind name x next) (mutate-js-expr js-expr const-list inputs prev-depth))))
-     (define mutate-next
-       (map (lambda (x) (list 'bind name js-expr x) (mutate-inst-imp next (cons name const-list) inputs prev-depth))))
-     (append mutate-bind-arg
-             mutate-next)]))
+  (mutate-bind inst '() const-list inputs prev-depth #t))
 
 (define (mutate-return inst symbol-list const-list inputs prev-depth)
   (match inst

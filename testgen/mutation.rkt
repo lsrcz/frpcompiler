@@ -105,7 +105,19 @@
                      [output (interpreter spec trace)])
                 (rx-test-case trace output))))))
   (define max-trace (get-symbolic-trace constructor-list max-len))
-  (define-values (well-formed not-well-formed) (partition (lambda (x) (check-semantics interpreter x max-trace)) mutants))
+  (define (partition f lst)
+    (if (null? lst)
+        (cons '() '())
+        (let* ([t (partition f (cdr lst))]
+               [x (car t)]
+               [y (cdr t)])
+          (if (f (car lst))
+              (cons (cons (car lst) x) y)
+              (cons x (cons (car lst) y))))))
+  (define partitioned (partition (lambda (x) (check-semantics interpreter x max-trace)) mutants))
+  (define well-formed (car partitioned))
+  (define not-well-formed (cdr partitioned))
+
   (define (add-killeds killeds result)
     (match killeds
       [(list) result]
@@ -330,7 +342,88 @@
     (displayln result)
      
     )
+
+  (define (test-case5)
+    (define sprinkler-spec
+      (spec
+       '(clock motion)
+       'sprinkler
+       '(eq? undefined?)
+       '(six sixten detected not-detected on off f1 f2)
+       '((clock six) (motion not-detected))
+       '((clock (case-multi ((eq? clock six)
+                             (eq? clock sixten)
+                             (and (eq? motion detected) (eq? (prev motion) not-detected))
+                             (and (eq? motion not-detected) (eq? (prev motion) detected)))
+                            ((return on)
+                             (return off)
+                             (return-empty))
+                            f1))
+         (motion (case-multi ((eq? clock six)
+                              (eq? clock sixten)
+                              (and (eq? motion detected) (eq? (prev motion) not-detected))
+                              (and (eq? motion not-detected) (eq? (prev motion) detected)))
+                             ((return on)
+                              (return off)
+                              (return-empty))
+                             f2)))))
+
+    (define mutants (mutate-spec sprinkler-spec 2))
+    (displayln (length mutants))
+
+    (define (clock-constructor) (choose* 'six 'sixten))
+    (define (motion-constructor) (choose* 'detected 'not-detected))
+
+    
+    (define (f1 b1 b2 b3 b4)
+      (cond [b1 0]
+            [b2 1]
+            [else 2]))
+    (define (f2 b1 b2 b3 b4)
+      (cond [(and b4 b1) 0]
+            [b3 1]
+            [else 2]))
+
+(define six 'six)
+(define sixten 'sixten)
+(define detected 'detected)
+(define not-detected 'not-detected)
+(define on 'on)
+(define off 'off)
+    
+(define (and-func a b)
+  (and a b))
+
+
+
+    (define binding-input (list
+                           (binding 'f1 f1)
+                           (binding 'f2 f2)
+                           (binding 'eq? eq?)
+                           (binding 'six six)
+                           (binding 'sixten sixten)
+                           (binding 'detected detected)
+                           (binding 'not-detected not-detected)
+                           (binding 'undefined? undefined?)
+                           (binding 'not not)
+                           (binding 'and and-func)
+                           (binding 'on on)
+                           (binding 'off off)))
+
+    (define (interpreter spec trace) (interpret-spec spec trace binding-input))
+
+    (define constructor-list (list
+                          (cons 'clock clock-constructor)
+                          (cons 'motion motion-constructor)))
+
+    (displayln (check-semantics interpreter sprinkler-spec (get-symbolic-trace constructor-list 5)))
+
+    (define result (time (format-result (gen-test-on-mutants sprinkler-spec mutants interpreter constructor-list 1 5 1))))
+
+    (displayln result)
+     
+    )
   ;(test-case4)
-    (test-case4)
+    (test-case5)
   )
 (main)
