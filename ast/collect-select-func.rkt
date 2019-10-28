@@ -28,7 +28,7 @@
           (cons (int-func mapping (length args) (length branchs))
             (append* branchs))))
       (cons 'begin (lambda lst (last lst)))
-      (cons 'return (lambda () '()))
+      (cons 'return (lambda (_) '()))
       (cons 'return-empty (lambda () '()))
       (cons 'custom (lambda (_ body) body))
       (cons 'split (lambda (_ body) body))
@@ -40,7 +40,6 @@
     ))
   (append* (map
     (lambda (x)
-      (displayln (cadr x))
       (visit (visitor descend-list '() descend-list '()) (cadr x) #f))
     (spec-body spec))))
 
