@@ -14,6 +14,8 @@
 
 (require racket/engine)
 
+(provide (all-defined-out))
+
 (struct test-suite-gen-result (suite survived killed timeouted not-well-formed) #:transparent)
 (define (add-test gen-result test-case)
   (match gen-result
