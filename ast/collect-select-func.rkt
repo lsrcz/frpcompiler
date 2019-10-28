@@ -9,6 +9,10 @@
 (struct boolean-func (name argnum) #:transparent)
 (struct int-func (name argnum branchnum) #:transparent)
 
+(define (collected-name func)
+  (if (boolean-func? func) (boolean-func-name func)
+      (int-func-name func)))
+
 (define (collect-select-func spec)
   (define descend-list
     (list
