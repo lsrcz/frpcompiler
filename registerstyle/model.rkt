@@ -20,10 +20,10 @@
 
 (define NOEVENT 'no-evt)
 
-(define (empty-event? e)
+(define (empty-event-reg? e)
   (eq? NOEVENT e))
 
-(define (not-empty-event? e)
+(define (not-empty-event-reg? e)
   (not (eq? NOEVENT e)))
 
 ;; In a symbolic stream, each element is a symbolic union of the non-event symbol
