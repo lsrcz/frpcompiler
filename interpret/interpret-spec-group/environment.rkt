@@ -1,7 +1,6 @@
 #lang rosette/safe
 
 (require "analyzed.rkt")
-(require rackunit)
 (require rosette/lib/match)
 (require rosette/base/struct/struct)
 

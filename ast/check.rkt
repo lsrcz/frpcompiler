@@ -3,7 +3,6 @@
 (require "../test/test-spec.rkt")
 (require "spec.rkt")
 (require "syntax.rkt")
-(require rackunit)
 
 (provide check-spec)
 
@@ -98,7 +97,8 @@
   (match spec-input
     [(spec _ _ _ _ _ body) (check-spec-body body)]))
 
-(define (main)
+(module+ test
+  (require rackunit)
   (check-equal? (check-begin-let
                  '((a (begin (let x a) (if a (return b)))))) #t)
   (check-equal? (check-begin-let
@@ -133,5 +133,5 @@
                  '((a (split (()) (new-stream ((a (return a)))))))) #f)
   (check-equal? (check-spec-body
                  '((a (if-else a (split (()) (empty-stream)) (return a))))) #f)
-  )
-(main)
+)
+

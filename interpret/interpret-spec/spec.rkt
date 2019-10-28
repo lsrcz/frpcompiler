@@ -6,7 +6,6 @@
 (require "analyzed.rkt")
 (require "../subscribe-fsm.rkt")
 (require "../../ast/syntax.rkt")
-(require rackunit)
 (require rosette/lib/match)
 
 (provide interpret-spec analyze)
@@ -566,7 +565,8 @@
                  [glb-env (global-env trace 0 inputs output 'undefined 'undefined sons (bv 1 numne) sym-bv-mapping binding-lst)])
             (construct-list glb-env))]))]))
 
-#;(define (main)
+(module+ test
+  (require rackunit)
   (define spec1 (spec '(a d) 'b '(f) '(t) '((a (if d (return (f a (prev a))))))))
   (define spec2 (spec '(a d) 'b '(f) '(t) '((a (if-else d (return (f a (prev a))) (return (g a (prev a))))))))
   (define spec3 (spec '(a d) 'b '(f) '(t) '((a (if-else d (return (f a (prev a))) (return a))))))

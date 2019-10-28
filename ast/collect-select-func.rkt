@@ -44,9 +44,8 @@
       (visit (visitor descend-list '() descend-list '()) (cadr x) #f))
     (spec-body spec))))
 
-(define (main)
+(module+ test
   (define test-spec (spec '(a b) 'c '(f1 f2) '(a1 b1) '()
     '((a (case-multi ((eq? a a1) (eq? a a1)) ((if-multi ((eq? b b1) (eq? b b1)) (return-empty) f2)) f1)))))
   (displayln (collect-select-func test-spec))
 )
-(main)

@@ -72,7 +72,7 @@
               (all-found))])
     (merge-missing (list missing-in-arg missing-in-next-inst-first missing-in-next-inst-second))))
 
-(define (main)
+(module+ test
   (println (find-missing-var '((g a)) '(f g) 'd '() '(f (g a))))
   (println (find-missing-var '() '(f g) 'd '() '(f (g (prev a)))))
   (println (find-missing-var-deep '() '(f g) 'd '() '(bind a (f t) (return a))))

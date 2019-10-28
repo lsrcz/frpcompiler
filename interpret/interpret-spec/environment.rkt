@@ -210,8 +210,7 @@
                  (let ([env (environment glb-env (local-env '() (list-ref sub-binding idx)))])
                    (environment-glb-env (call env)))])))))]))
               
-#|
-(define (main-env)
+(module+ test
   (define tr
     (trace
      (list
@@ -286,4 +285,4 @@
   (check-equal? (resolve-environment (advance-time (advance-time env)) 'c) (resolved -1))
   (check-equal? (resolve-environment (advance-time (advance-time env)) 'd) (resolved -11))
   (check-equal? (resolve-environment (advance-time (advance-time env)) 'x) (resolved -100))
-  )|#
+  )

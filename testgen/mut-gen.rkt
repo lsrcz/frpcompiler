@@ -336,7 +336,7 @@
      (map (lambda (x) (spec inputs output funclist const-list defaultval x)) (mutate-body body const-list inputs prev-depth))]))
            
 
-(define (main-mut-gen)
+(module+ test
   (mutate-js-expr '(f a b c) '(a b c) '(a b c) 2)
   (mutate-js-expr '(f (prev a) b c) '(a b c) '(a b c) 2)
   (mutate-js-expr 'a '(a b c) '(a b c) 2)

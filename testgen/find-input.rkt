@@ -11,7 +11,7 @@
   (time (synthesize #:forall (list)
               #:guarantee (assert (equal? (interpret-spec spec sym-trace binding) output)))))
 
-(define (main1)
+(module+ test
   (define (test-case1)
     (define spec-input (spec '(a) 'b '() '() '((a (return a)))))
     (define binding (list))
@@ -217,4 +217,3 @@
 
   )
 
-(main1)

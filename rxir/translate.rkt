@@ -236,7 +236,7 @@
     (rxir-list rxir-input-inst-list (map cdr (iter ir-list-input '()))))
   (emit-rxir-inner (ir-list-lst ir-list-input)))
 
-(define (main)
+(module+ test
   (let* ([r1 (input-inst 'a 0 'a)]
          [r2 (input-inst 'b 1 '(b (prev b)))]
          [r3 (intro-inst (list r1) r2 '(b (prev b) a))]

@@ -43,7 +43,7 @@
     [(spec inputs output funclist constantlist defaultval body)
      (spec inputs output funclist constantlist defaultval (map monad-desugar body))]))
 
-(define (main)
+(module+ test
   (println (monad-desugar
             '(mode
               (begin
@@ -103,7 +103,6 @@
   (println (monad-desugar-spec drawing-spec))
   )
 
-(main)
 
               
           

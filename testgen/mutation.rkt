@@ -137,7 +137,7 @@
                   (add-test (add-killeds killeds (iter surviveds)) result))]))]))
   (iter well-formed))
 
-(define (main)
+(module+ test
   (define (test-case1)
     (define spec1-input
       (spec '(a b) 'd '(add1 + - not >) '(t x) '()
@@ -426,4 +426,3 @@
   ;(test-case4)
     (test-case5)
   )
-(main)

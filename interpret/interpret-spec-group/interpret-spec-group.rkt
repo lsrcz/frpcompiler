@@ -6,7 +6,6 @@
 (require "spec-group-definition.rkt")
 (require "../subscribe-fsm.rkt")
 (require "../ast/spec.rkt")
-(require rackunit)
 (require rosette/lib/match)
 (require rosette/base/struct/struct)
 
@@ -426,7 +425,8 @@
               (run-trace rest (set-ret-value name value (push-empty-glb glb-env)))])))
      (run-trace (trace-event-lst trace) initial-glb-env)]))
 
-(define (main)
+(module+ test
+  (require rackunit)
   (define spec1 (spec '(a d) 'b '(f) '(t) '((a (if d (return (f a)))))))
   (define spec2 (spec '(a d) 'b '(f) '(t) '((a (if-else d (return (f a (prev a))) (return (g a (prev a))))))))
   (define spec3 (spec '(a d) 'b '(f) '(t) '((a (if-else d (return (f a (prev a))) (return a))))))

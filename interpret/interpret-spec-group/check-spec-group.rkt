@@ -3,7 +3,6 @@
 (require "spec-group-definition.rkt")
 (require "../test/test-spec.rkt")
 (require "../ast/spec.rkt")
-(require rackunit)
 
 
 (define (extract-edges spec-input)
@@ -57,7 +56,8 @@
                              (and (check-output-not-in-inputs x edges)
                                   (check-istree x edges))) externals))))]))
 
-(define (main-check)
+(module+ test
+  (require rackunit)
   (displayln (extract-edges drawing-split-spec))
   (displayln (extract-edges drawing-spec))
   (check-equal?

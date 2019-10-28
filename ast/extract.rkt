@@ -84,9 +84,9 @@
 
 (require "monad-desugar.rkt")
 
-(define (main)
+(module+ test
   (println (extract-spec (monad-desugar-spec drawing-spec)))
   (println (extract-spec (monad-desugar-spec drawing-split-spec))))
-(main)
+
 
 

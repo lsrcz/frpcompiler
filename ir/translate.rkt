@@ -382,7 +382,7 @@
      (let ([input-map (get-inputs-map spec-input)])
        (translate-body input-map output funclist constantlist body))]))
 
-(define (main)
+(module+ test
   (define spec
     '(bind _temp3
            (f mode)
