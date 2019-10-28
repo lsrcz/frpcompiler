@@ -14,3 +14,10 @@
    (set! num (+ 1 num))
    ret)))
 
+(define (make-list num v)
+  (if (= num 0)
+      '()
+      (cons v (make-list (- num 1) v))))
+
+
+
