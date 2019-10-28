@@ -1,6 +1,5 @@
 #lang rosette/safe
 
-;(require rackunit)
 (require "analyzed.rkt"
          "../../test/trace.rkt")
 (require rosette/lib/match)
@@ -211,6 +210,7 @@
                    (environment-glb-env (call env)))])))))]))
               
 (module+ test
+  (require rackunit)
   (define tr
     (trace
      (list
